@@ -96,6 +96,9 @@ class HazardSet():
             List of hazard ids to be removed from the hazard set.
         """
 
+        if haz_id is str:
+            haz_id = list([haz_id])
+
         if haz_id is not None:
             for haz in haz_id:
                 try:
@@ -150,7 +153,7 @@ class HazardSet():
             for haz in list(self._data.keys()):
                 haz_types.append(self._data[haz].tag.haz_type)
         else:
-            haz_types = self._data[haz_id].tag.haz_type
+            haz_types = list([self._data[haz_id].tag.haz_type])
 
         return haz_types
 
