@@ -128,7 +128,7 @@ class HazardSet():
             return list()
 
 
-    def get_hazard_types(self, haz_id=None):
+    def get_haz_types(self, haz_id=None):
         """Get hazard types contained for the id(s) provided.
         Return all hazard types if no input id.
 
@@ -173,7 +173,7 @@ class HazardSet():
         if haz_type is None:
             haz_ids = list(self._data.keys())
         else:
-            haz_types = self.get_hazard_types()
+            haz_types = self.get_haz_types()
             haz_ids = [list(self._data.keys())[i] for i, j in enumerate(haz_types) if j == haz_type]
 
         return haz_ids
