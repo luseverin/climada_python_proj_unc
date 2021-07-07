@@ -58,7 +58,8 @@ class HazardSet():
 
 
     def append(self, haz, haz_id=None):
-        """Append a Hazard. Overwrite existing hazard with same hazard id.
+        """Append a Hazard. Give next unalloced integer id to hazards without id
+        or wiht an hazard id already contained in the HazardSet.
 
         Parameters
         ----------
@@ -74,17 +75,22 @@ class HazardSet():
         """
 
         if not isinstance(haz, Hazard):
-            raise ValueError("Input value is not of type Hazard.")
-        if haz_id is None:
+            raise TypeError("Input variable haz is not of type Hazard.")
+
+        if haz_id is None or haz_id in list(self._data.keys()):
             idx = '1'
             while idx in list(self._data.keys()):
                 idx = str(int(idx)+1)
+
+            if haz_id in list(self._data.keys()):
+                LOGGER.warning("A hazard with  the id %s is already contained"
+                               "in this hazard set. The id is set to %s.", haz_id, idx)
             haz_id = idx
 
         self._data[haz_id] = haz
 
 
-    def remove_haz(self, haz_id=None):
+    def remove_haz(self, haz_id):
         """Remove hazard(s) with provided hazard id.
         If no input provided, all hazards are removed.
 
@@ -92,22 +98,19 @@ class HazardSet():
         ----------
         haz : climada.hazard.Hazard()
             Hazard instance.
-        haz_id : list
-            List of hazard ids to be removed from the hazard set.
+        haz_id : str
+            id of hazard to be removed from the hazard set.
         """
 
-        if haz_id is str:
-            haz_id = list([haz_id])
 
-        if haz_id is not None:
-            for haz in haz_id:
-                try:
-                    del self._data[haz]
-                except KeyError:
-                    LOGGER.warning("The hazard with haz_id %s is not contained"
-                                   "in this hazard set.", haz)
-        else:
+        if haz_id == 'all':
             self._data = dict()
+        else:
+            try:
+                del self._data[haz_id]
+            except KeyError:
+                LOGGER.warning("The hazard with haz_id %s is not contained"
+                               "in this hazard set.", haz_id)
 
 
     def get_haz(self, haz_id):
@@ -128,16 +131,15 @@ class HazardSet():
             return self._data[haz_id]
         except KeyError:
             LOGGER.warning("The hazard with haz_id %s is not contained in this hazard set.", haz_id)
-            return list()
+            return None
 
-
-    def get_haz_types(self, haz_id=None):
+    def get_haz_types(self, haz_id='all'):
         """Get hazard types contained for the id(s) provided.
         Return all hazard types if no input id.
 
         Parameters
         ----------
-        haz_id : list
+        haz_id : string
             Hazard id.
 
         Returns
@@ -149,22 +151,24 @@ class HazardSet():
 
         haz_types = []
 
-        if haz_id is None:
-            for haz in list(self._data.keys()):
-                haz_types.append(self._data[haz].tag.haz_type)
+        if haz_id == 'all':
+            haz_types = [
+                self._data[haz].tag.haz_type
+                for haz in list(self._data.keys())
+            ]
         else:
-            haz_types = list([self._data[haz_id].tag.haz_type])
+            haz_types = [self._data[haz_id].tag.haz_type]
 
         return haz_types
 
 
-    def get_haz_ids(self, haz_type=None):
+    def get_ids(self, haz_type='all'):
         """
-        Get hazard ids of a specific hazard type.
+        Get hazard ids (of a specific hazard type).
 
         Parameters
         ----------
-        haz_type : str
+        haz_type : str, optional
             Hazard type to return ids for. The default is None and returns a list of the ids.
 
         Returns
@@ -173,11 +177,10 @@ class HazardSet():
             List of hazard ids of the specified hazard type.
 
         """
-        if haz_type is None:
+        if haz_type == 'all':
             haz_ids = list(self._data.keys())
         else:
-            haz_types = self.get_haz_types()
-            haz_ids = [list(self._data.keys())[i] for i, j in enumerate(haz_types) if j == haz_type]
+            haz_ids = [haz_id for haz_id, haz in self._data.items() if haz.tag.haz_type == haz_type]
 
         return haz_ids
 
@@ -194,6 +197,48 @@ class HazardSet():
 
         self.tag.append(haz_set.tag)
 
-        new_haz_set = haz_set.get_haz_ids()
+        new_haz_set = haz_set.get_ids()
         for haz_id in new_haz_set:
             self.append(haz_set.get_haz(haz_id), haz_id)
+
+    def select(self, haz_type='all', event_names=None, date=None, orig=None,
+               reg_id=None, reset_frequency=False):
+
+        """Select events matching provided criteria
+
+        The frequency of events may need to be recomputed (see `reset_frequency`)!
+
+        Parameters
+        ----------
+        haz_type: str
+            Hazard type to be extracted. Default 'al' returns all Hazards contained
+            in the HazardSet that fulfill the rest of the criteria (taken from hazard.select method)
+        event_names : list of str, optional
+            Names of events.
+        date : array-like of length 2 containing str or int, optional
+            (initial date, final date) in string ISO format ('2011-01-02') or datetime
+            ordinal integer.
+        orig : bool, optional
+            Select only historical (True) or only synthetic (False) events.
+        reg_id : int, optional
+            Region identifier of the centroids' region_id attibute.
+        reset_frequency : bool, optional
+            Change frequency of events proportional to difference between first and last
+            year (old and new). Default: False.
+
+        Returns
+        -------
+        haz_set : HazardSet
+            HazardSet containing only the hazards that fulfill the provided criteria
+        """
+
+        haz_set = HazardSet()
+
+        haz_ids = self.get_ids(haz_type)
+        for haz_id in haz_ids:
+            haz = self.get_haz(haz_id).select(event_names, date, orig, reg_id,
+                                      reset_frequency)
+            if haz is not None:
+                haz_set.append(haz, haz_id)
+
+        return haz_set

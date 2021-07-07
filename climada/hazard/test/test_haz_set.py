@@ -26,6 +26,8 @@ from climada.hazard.river_flood import RiverFlood
 from climada.hazard.hazard_set import HazardSet
 
 FLOOD = RiverFlood()
+FLOOD.event_name = list(['2002', 'innundation7', 'test3'])
+
 RELATIVE_CROPYIELD = RelativeCropyield()
 
 class TestContainer(unittest.TestCase):
@@ -37,13 +39,13 @@ class TestContainer(unittest.TestCase):
         hazard_set1.append(haz=FLOOD, haz_id='flood1')
         hazard_set1.append(RELATIVE_CROPYIELD)
         hazard_set1.append(RELATIVE_CROPYIELD, 'crop2')
-        hazard_set1.append(FLOOD)
+        hazard_set1.append(FLOOD, 'flood1')
         self.assertEqual(4, len(hazard_set1._data))
         self.assertEqual(list(['flood1', '1', 'crop2', '2']), list(hazard_set1._data.keys()))
 
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TypeError) as cm:
             hazard_set1.append(45)
-        self.assertIn("Input value is not of type Hazard.", str(cm.exception))
+        self.assertIn("Input variable haz is not of type Hazard.", str(cm.exception))
 
     def test_remove_haz_pass(self):
         """Test remove_haz removes Hazards of HazardSet correctly."""
@@ -59,18 +61,13 @@ class TestContainer(unittest.TestCase):
         self.assertIn("The hazard with haz_id drought is not contained "
                                    "in this hazard set.", cm.output[0])
 
-        #remove a list
-        hazard_set1.remove_haz(['flood1'])
-        self.assertEqual(3, len(hazard_set1._data))
-        self.assertEqual(list(['1', 'crop2', '2']), list(hazard_set1._data.keys()))
-
         #remove a string
         hazard_set1.remove_haz('1')
-        self.assertEqual(2, len(hazard_set1._data))
-        self.assertEqual(list(['crop2', '2']), list(hazard_set1._data.keys()))
+        self.assertEqual(3, len(hazard_set1._data))
+        self.assertEqual(list(['flood1', 'crop2', '2']), list(hazard_set1._data.keys()))
 
         #remove all hazards
-        hazard_set1.remove_haz()
+        hazard_set1.remove_haz('all')
         self.assertEqual(0, len(hazard_set1._data))
 
     def test_get_haz(self):
@@ -100,13 +97,13 @@ class TestContainer(unittest.TestCase):
 
         #of a single hazard
         haz_type = hazard_set1.get_haz_types('flood1')
-        self.assertEqual(list(['RF']), haz_type)
+        self.assertEqual(['RF'], haz_type)
 
         #of all contained hazards
         haz_types = hazard_set1.get_haz_types()
         self.assertEqual(list(['RF', 'RC', 'RC', 'RF']), haz_types)
 
-    def test_get_haz_ids(self):
+    def test_get_ids(self):
         """Test get_haz_ids returns hazard ids of HazardSet correctly."""
         hazard_set1 = HazardSet()
         hazard_set1.append(haz=FLOOD, haz_id='flood1')
@@ -115,15 +112,15 @@ class TestContainer(unittest.TestCase):
         hazard_set1.append(haz=FLOOD)
 
         #of a certain hazard type
-        haz_ids = hazard_set1.get_haz_ids('RC')
+        haz_ids = hazard_set1.get_ids('RC')
         self.assertEqual(haz_ids, list(['1', 'crop2']))
 
         #of all hazards
-        haz_ids = hazard_set1.get_haz_ids()
+        haz_ids = hazard_set1.get_ids()
         self.assertEqual(haz_ids, list(['flood1','1', 'crop2', '2']))
 
     def test_extend(self):
-        """Test extend extends HazardSet by a second HazardSet correctly."""
+        """Test extend appends HazardSet by a second HazardSet correctly."""
         hazard_set1 = HazardSet()
         hazard_set1.append(haz=FLOOD, haz_id='flood1')
         hazard_set1.append(RELATIVE_CROPYIELD)
@@ -137,11 +134,19 @@ class TestContainer(unittest.TestCase):
 
         hazard_set1.extend(hazard_set2)
         #hazards with the same id as in the extending hazard set get overwritten ('1')
-        self.assertEqual(3, len(hazard_set1._data))
-        self.assertEqual(list(['flood1', '1', 'crop2']), list(hazard_set1._data.keys()))
-        #assert that RC hazard has been overwritten by RF hazard
+        self.assertEqual(4, len(hazard_set1._data))
+        self.assertEqual(list(['flood1', '1', 'crop2', '2']), list(hazard_set1._data.keys()))
+        #assert the two hazards with same ide remain in the HazardSet and the second one has been renamed
         haz_type = hazard_set1.get_haz_types('1')
+        self.assertEqual(haz_type, ['RC'])
+        haz_type = hazard_set1.get_haz_types('2')
         self.assertEqual(haz_type, ['RF'])
+    
+    def test_select(self):
+        """Test select allows to extract a part of the Hazards of HazardSet correctly."""
+        
+        
+        
 
 
 # Execute Tests
