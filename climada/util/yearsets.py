@@ -146,6 +146,40 @@ def impact_yearset_from_sampling_vect(imp, sampled_years, sampling_vect, correct
 
     return yimp
 
+def extract_from_matrix(mat, sampling_vec):
+    """
+    Extract sampled events from impact matrix
+
+    Parameters
+    ----------
+    mat : scipy.sparse.csr_matrix
+        Impact matrix to sample from
+    sampling_vec : 2D np.array()
+        Array of ids (row index) of selected events per year.
+
+    Returns
+    -------
+    scipy.sparse.csr_matrix
+        Impact matrix of selected sample of events
+
+    """
+    sampling_vec = np.concatenate(sampling_vec)
+    return mat[sampling_vec, :]
+
+def year_date_event_in_sample(years, dates, sampling_vec):
+    if len(years) != len(sampling_vec):
+        raise ValueError("The number of years is different from the length" +
+                         "of the sampling vector")
+    def change_year(old_date, year):
+        new_date = u_dt.date_to_str(old_date)
+        new_date.replace(new_date[0:4], str(year))
+        return u_dt.str_to_date(new_date)
+
+    return [
+        change_year(date, year)
+        for year, events in zip(years, sampling_vec)
+        for date in np.array(dates)[events]
+        ]
 
 def sample_from_poisson(n_sampled_years, lam, seed=None):
     """Sample the number of events for n_sampled_years
