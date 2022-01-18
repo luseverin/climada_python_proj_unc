@@ -146,9 +146,39 @@ def impact_yearset_from_sampling_vect(imp, sampled_years, sampling_vect, correct
 
     return yimp
 
-def impact_from_sample(imp, sampling_vec):
-    impact = Impact()
-    impact.set_
+def impact_from_sample(imp, years, sampling_vec):
+    """
+    Set impact object from sample of events
+
+    Note: frequency is set to 1 for all events.
+
+    Parameters
+    ----------
+    imp : Impact
+        Impact to sample event impact from
+    years : list
+        List of the years from the sampling vector
+    sampling_vec : list[np.array]
+        Array of ids (row index) of selected events per year.
+
+    Returns
+    -------
+    impact: Impact
+        Impact reduced to sample of events
+
+    """
+    if imp.imp_mat.nnz == 0:
+        raise AttributeError("The impact matrix from imp.imp_mat is empty.")
+
+    impact = copy.deepcopy(imp)
+    imp_mat = extract_event_matrix(mat=impact.imp_mat, ssampling_vec=sampling_vec)
+    impact.set_imp_mat(imp_mat)
+    impact.date = year_date_event_in_sample(years=years, dates=impact.date,
+                                            sampling_vec=sampling_vec)
+    impact.event_id = np.arange(1, len(impact.at_event) + 1)
+    impact.frequency = frequency_for_sample(sampling_vec)
+    return impact
+
 
 def extract_event_matrix(mat, sampling_vec):
     """
