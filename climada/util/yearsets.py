@@ -16,6 +16,8 @@ Define functions to handle impact_yearsets
 import copy
 import logging
 import numpy as np
+import scipy as sp
+
 from numpy.random import default_rng
 
 import climada.util.dates_times as u_dt
@@ -145,6 +147,78 @@ def impact_yearset_from_sampling_vect(imp, sampled_years, sampling_vect, correct
                                                             )/n_sampled_years
 
     return yimp
+
+def years_from_imp(imp):
+    """
+    Extract the years of all events in the impact
+
+    Parameters
+    ----------
+    imp : Impact
+        Impact with events
+
+    Returns
+    -------
+    list
+        Years of each event in imp (same ordering).
+
+    """
+    return [int(u_dt.date_to_str(date)[0:4]) for date in imp.date]
+
+def sum_impact_year_per_year(imp):
+    """
+    Sum the impact for all events in the same year
+
+    Parameters
+    ----------
+    imp : Impact
+        Impact with impact matrix and events over several years
+
+    Returns
+    -------
+    sp.sparse.csr_matrix
+        Impact matrix with one event per year
+
+    """
+    mat = imp.imp_mat
+    years = years_from_imp(imp)
+    mask =[np.ma.make_mask(years == year).astype(int)
+           for year in np.unique(years)]
+    mask_matrix =  sp.sparse.csr_matrix(mask)
+    return mask_matrix.dot(mat)
+
+def aggregate_impact_to_year(imp):
+    """
+    Aggregate the impact per year to make yearsets
+
+    Parameters
+    ----------
+    imp : Impact
+        Impact with an impact matrix and events with dates per year
+
+    Raises
+    ------
+    AttributeError
+        If impact matrix is empty.
+
+    Returns
+    -------
+    impact : Impact
+        Impact yearset.
+
+    """
+    if imp.imp_mat.nnz == 0:
+        raise AttributeError("The impact matrix from imp.imp_mat is empty.")
+
+    impact = copy.deepcopy(imp)
+    imp_mat = sum_impact_year_per_year(impact)
+    impact.set_imp_mat(imp_mat)
+    impact.date = u_dt.str_to_date([str(date) + '-01-01' for date in years_from_imp(imp)])
+    impact.event_id = np.arange(1, len(impact.at_event) + 1)
+    impact.frequency = np.ones(len(impact.at_event))
+    impact.tag['yimp object'] = True
+    return impact
+
 
 def impact_from_sample(imp, years, sampling_vec):
     """
