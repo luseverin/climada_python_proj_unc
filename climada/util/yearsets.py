@@ -261,12 +261,12 @@ def impact_from_sample(imp, years, sampling_vec):
         raise AttributeError("The impact matrix from imp.imp_mat is empty.")
 
     impact = copy.deepcopy(imp)
-    imp_mat = extract_event_matrix(mat=impact.imp_mat, ssampling_vec=sampling_vec)
-    impact.set_imp_mat(imp_mat)
     impact.date = year_date_event_in_sample(years=years, dates=impact.date,
                                             sampling_vec=sampling_vec)
-    impact.event_id = np.arange(1, len(impact.at_event) + 1)
     impact.frequency = frequency_for_sample(sampling_vec)
+    imp_mat = extract_event_matrix(mat=impact.imp_mat, sampling_vec=sampling_vec)
+    impact = impact.set_imp_mat(imp_mat)
+    impact.event_id = np.arange(1, len(impact.at_event) + 1)
     return impact
 
 
@@ -344,7 +344,8 @@ def frequency_for_sample(sampling_vec):
         Frequency (1/year) of each sampled event
 
     """
-    return np.ones(np.size(sampling_vec))
+    n_events = np.size(sampling_vec)
+    return np.ones(n_events)/n_events
 
 
 def sample_from_poisson(n_sampled_years, lam, seed=None):
