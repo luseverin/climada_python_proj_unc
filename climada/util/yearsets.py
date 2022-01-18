@@ -146,6 +146,10 @@ def impact_yearset_from_sampling_vect(imp, sampled_years, sampling_vect, correct
 
     return yimp
 
+def impact_from_sample(imp, sampling_vec):
+    impact = Impact()
+    impact.set_
+
 def extract_event_matrix(mat, sampling_vec):
     """
     Extract sampled events from impact matrix
