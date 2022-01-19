@@ -331,7 +331,6 @@ def year_date_event_in_sample(years, dates, sampling_vec):
         for date in np.array(dates)[events]
         ]
 
-def sample_from_poisson(n_sampled_years, lam, seed=None):
 def frequency_for_sample(sampling_vec):
     """
     Generate frequency vector for selected sample of events
