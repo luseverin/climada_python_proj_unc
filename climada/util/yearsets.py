@@ -165,15 +165,17 @@ def years_from_imp(imp):
     """
     return [int(u_dt.date_to_str(date)[0:4]) for date in imp.date]
 
-def sum_impact_year_per_year(imp):
+def sum_impact_year_per_year(imp, exp=None):
     """
-    Sum the impact for all events in the same year
+    Sum the impact for all events in the same year. Impact per year cannot
+    exceed exposures value.
 
     Parameters
     ----------
     imp : Impact
         Impact with impact matrix and events over several years
-
+    exp: Exposure, optional
+        Exposure of the Impact. If none, impact is simply summed.
     Returns
     -------
     sp.sparse.csr_matrix
@@ -185,17 +187,31 @@ def sum_impact_year_per_year(imp):
     mask =[np.ma.make_mask(years == year).astype(int)
            for year in np.unique(years)]
     mask_matrix =  sp.sparse.csr_matrix(mask)
-    return mask_matrix.dot(mat)
+    sum_mat = mask_matrix.dot(mat)
+    if exp is not None:
+        exp_mat = np.repeat(exp.gdf.value.to_numpy(), len(years))
+        def sparse_min(A, B):
+             """
+             Return the element-wise maximum of sparse matrices `A` and `B`.
+             """
+             AgtB = (A < B).astype(int)
+             M = AgtB.multiply(A - B) + B
+             return M
+        sum_mat = sparse_min(sum_mat, exp_mat)
+    return sum_mat
 
-def aggregate_impact_to_year(imp):
+def aggregate_impact_to_year(imp, exp=None):
     """
-    Aggregate the impact per year to make yearsets
+    Aggregate the impact per year to make yearsets. Maximum impact per year
+    at each exposure point is exposure value if exp is not None.
 
     Parameters
     ----------
     imp : Impact
         Impact with an impact matrix and events with dates per year
 
+    exp : Exposure
+        Exposure of Impact.
     Raises
     ------
     AttributeError
@@ -211,7 +227,7 @@ def aggregate_impact_to_year(imp):
         raise AttributeError("The impact matrix from imp.imp_mat is empty.")
 
     impact = copy.deepcopy(imp)
-    imp_mat = sum_impact_year_per_year(impact)
+    imp_mat = sum_impact_year_per_year(impact, exp)
     impact.set_imp_mat(imp_mat)
     impact.date = u_dt.str_to_date([str(date) + '-01-01' for date in years_from_imp(imp)])
     impact.event_id = np.arange(1, len(impact.at_event) + 1)
