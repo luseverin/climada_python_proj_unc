@@ -189,14 +189,14 @@ def sum_impact_year_per_year(imp, exp=None):
     mask_matrix =  sp.sparse.csr_matrix(mask)
     sum_mat = mask_matrix.dot(mat)
     if exp is not None:
-        exp_mat = np.repeat(exp.gdf.value.to_numpy(), len(years))
+        exp_mat = np.stack([exp.gdf.value.to_numpy() for n in np.unique(years)])
         def sparse_min(A, B):
              """
              Return the element-wise maximum of sparse matrices `A` and `B`.
              """
              AgtB = (A < B).astype(int)
-             M = AgtB.multiply(A - B) + B
-             return M
+             M = np.multiply(AgtB, A - B) + B
+             return sp.sparse.csr_matrix(M)
         sum_mat = sparse_min(sum_mat, exp_mat)
     return sum_mat
 
@@ -228,10 +228,11 @@ def aggregate_impact_to_year(imp, exp=None):
 
     impact = copy.deepcopy(imp)
     imp_mat = sum_impact_year_per_year(impact, exp)
-    impact.set_imp_mat(imp_mat)
-    impact.date = u_dt.str_to_date([str(date) + '-01-01' for date in years_from_imp(imp)])
+    impact.frequency = np.ones(imp_mat.shape[0])/imp_mat.shape[0]
+    impact = impact.set_imp_mat(imp_mat)
+    impact.date = np.unique(u_dt.str_to_date([str(date) + '-01-01' for date in years_from_imp(impact)]))
     impact.event_id = np.arange(1, len(impact.at_event) + 1)
-    impact.frequency = np.ones(len(impact.at_event))
+    impact.event_name = impact.event_id
     impact.tag['yimp object'] = True
     return impact
 
@@ -318,8 +319,10 @@ def year_date_event_in_sample(years, dates, sampling_vec):
         raise ValueError("The number of years is different from the length" +
                          "of the sampling vector")
     def change_year(old_date, year):
-        new_date = u_dt.date_to_str(old_date)
-        new_date.replace(new_date[0:4], str(year))
+        old_date = u_dt.date_to_str(old_date)
+        if old_date[5:7] == '02' and old_date[8:10] == '29':
+            old_date = old_date.replace('29', '28')
+        new_date = old_date.replace(old_date[0:4], str(year))
         return u_dt.str_to_date(new_date)
 
     return [
@@ -344,8 +347,9 @@ def frequency_for_sample(sampling_vec):
         Frequency (1/year) of each sampled event
 
     """
-    n_events = np.size(sampling_vec)
-    return np.ones(n_events)/n_events
+    n_years = np.size(sampling_vec)
+    n_events = np.size(np.concatenate(sampling_vec))
+    return np.ones(n_events)/n_years
 
 
 def sample_from_poisson(n_sampled_years, lam, seed=None):
