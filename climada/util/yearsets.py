@@ -223,8 +223,8 @@ def aggregate_impact_to_year(imp, exp=None):
         Impact yearset.
 
     """
-    if imp.imp_mat.nnz == 0:
-        raise AttributeError("The impact matrix from imp.imp_mat is empty.")
+    #if imp.imp_mat.nnz == 0:
+    #    raise AttributeError("The impact matrix from imp.imp_mat is empty.")
 
     impact = copy.deepcopy(imp)
     imp_mat = sum_impact_year_per_year(impact, exp)
@@ -258,8 +258,8 @@ def impact_from_sample(imp, years, sampling_vec):
         Impact reduced to sample of events
 
     """
-    if imp.imp_mat.nnz == 0:
-        raise AttributeError("The impact matrix from imp.imp_mat is empty.")
+    #if imp.imp_mat.nnz == 0:
+    #    raise AttributeError("The impact matrix from imp.imp_mat is empty.")
 
     impact = copy.deepcopy(imp)
     impact.date = year_date_event_in_sample(years=years, dates=impact.date,
