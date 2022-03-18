@@ -225,6 +225,8 @@ class Exposures():
     __setitem__ = _access_item
     __delitem__ = _access_item
 
+    import cherry_profiler as cp
+    @cp.track
     def check(self):
         """Check Exposures consistency.
 
@@ -446,6 +448,16 @@ class Exposures():
         self.__dict__ = Exposures.from_raster(*args, **kwargs).__dict__
 
     @classmethod
+    def from_excel(cls, file_name, description='', exposure_sheet=None):
+        exp = cls(pd.read_excel(file_name, exposure_sheet) if exposure_sheet
+                  else pd.read_excel(file_name))
+        exp.tag = Tag()
+        exp.tag.file_name = str(file_name)
+        exp.tag.description = description
+        exp.check()
+        return exp
+    
+    @classmethod
     def from_raster(cls, file_name, band=1, src_crs=None, window=False,
                         geometry=False, dst_crs=False, transform=None,
                         width=None, height=None, resampling=Resampling.nearest):
@@ -500,6 +512,7 @@ class Exposures():
         exp.gdf['latitude'] = y_grid.flatten()
         exp.gdf['value'] = value.reshape(-1)
         exp.meta = meta
+        exp.check()
         return exp
 
     def plot_scatter(self, mask=None, ignore_zero=False, pop_name=True,
@@ -809,6 +822,7 @@ class Exposures():
             for key, val in metadata.items():
                 if key in type(exp)._metadata:
                     setattr(exp, key, val)
+        exp.check()
         return exp
 
     def read_mat(self, *args, **kwargs):
@@ -856,6 +870,7 @@ class Exposures():
         exp.set_gdf(GeoDataFrame(data=exposures))
 
         _read_mat_metadata(exp, data, file_name, var_names)
+        exp.check()
         return exp
 
     #

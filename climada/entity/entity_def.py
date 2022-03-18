@@ -121,11 +121,7 @@ class Entity(object):
             The entity from excel file
         """
 
-        exp = Exposures(pd.read_excel(file_name))
-        exp.tag = Tag()
-        exp.tag.file_name = str(file_name)
-        exp.tag.description = description
-
+        exp = Exposures.from_excel(file_name, description)
         dr = DiscRates.from_excel(file_name, description)
         impf_set = ImpactFuncSet.from_excel(file_name, description)
         meas_set = MeasureSet.from_excel(file_name, description)
@@ -150,6 +146,8 @@ class Entity(object):
         self.measures.write_excel(file_name)
         self.disc_rates.write_excel(file_name)
 
+    import cherry_profiler as cp
+    @cp.track
     def check(self):
         """Check instance attributes.
 

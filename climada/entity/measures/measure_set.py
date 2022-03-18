@@ -287,6 +287,8 @@ class MeasureSet():
             return len(self.get_measure(haz_type, name))
         return sum(len(meas_list) for meas_list in self.get_names().values())
 
+    import cherry_profiler as cp
+    @cp.track
     def check(self):
         """Check instance attributes.
 
@@ -321,7 +323,7 @@ class MeasureSet():
         ------
         ValueError
         """
-        meas_set.check()
+        #meas_set.check()
         if self.size() == 0:
             self.__dict__ = copy.deepcopy(meas_set.__dict__)
             return
@@ -410,6 +412,7 @@ class MeasureSet():
         except KeyError as var_err:
             raise KeyError("Variable not in MAT file: " + str(var_err)) from var_err
 
+        meas_set.check()
         return meas_set
 
     def read_mat(self, *args, **kwargs):
@@ -492,6 +495,7 @@ class MeasureSet():
         except KeyError as var_err:
             raise KeyError("Variable not in Excel file: " + str(var_err)) from var_err
 
+        meas_set.check()
         return meas_set
 
     def read_excel(self, *args, **kwargs):

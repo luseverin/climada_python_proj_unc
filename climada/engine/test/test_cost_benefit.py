@@ -53,7 +53,7 @@ class TestSteps(unittest.TestCase):
 
         self.assertTrue(ENT_TEST_MAT.is_file(), "{} is not a file".format(ENT_TEST_MAT))
         entity = Entity.from_mat(ENT_TEST_MAT)
-        entity.check()
+        #entity.check()
         entity.measures._data['TC'] = entity.measures._data.pop('XX')
         for meas in entity.measures.get_measure('TC'):
             meas.haz_type = 'TC'
@@ -281,7 +281,7 @@ class TestSteps(unittest.TestCase):
                                        risk_func=risk_aai_agg, save_imp=False)
 
         ent_future = Entity.from_excel(ENT_DEMO_FUTURE)
-        ent_future.check()
+        #ent_future.check()
 
         haz_future = copy.deepcopy(hazard)
         haz_future.intensity.data += 25
@@ -446,7 +446,7 @@ class TestSteps(unittest.TestCase):
         """Test combine_measures with present and future"""
         hazard = Hazard.from_mat(HAZ_TEST_MAT)
         entity = Entity.from_excel(ENT_DEMO_TODAY)
-        entity.check()
+        #entity.check()
         entity.exposures.ref_year = 2018
 
         fut_ent = copy.deepcopy(entity)
@@ -506,7 +506,7 @@ class TestSteps(unittest.TestCase):
         """Test combine_measures with only future"""
         hazard = Hazard.from_mat(HAZ_TEST_MAT)
         entity = Entity.from_excel(ENT_DEMO_TODAY)
-        entity.check()
+        #entity.check()
         entity.exposures.ref_year = 2018
         cost_ben = CostBenefit()
         cost_ben.calc(hazard, entity, future_year=2040, risk_func=risk_aai_agg,
@@ -546,7 +546,7 @@ class TestSteps(unittest.TestCase):
         """Test apply_risk_transfer with only future"""
         hazard = Hazard.from_mat(HAZ_TEST_MAT)
         entity = Entity.from_excel(ENT_DEMO_TODAY)
-        entity.check()
+        #entity.check()
         entity.exposures.ref_year = 2018
         cost_ben = CostBenefit()
         cost_ben.calc(hazard, entity, future_year=2040, risk_func=risk_aai_agg,
@@ -596,7 +596,7 @@ class TestSteps(unittest.TestCase):
         """Test apply_risk_transfer with only future annd cost factor"""
         hazard = Hazard.from_mat(HAZ_TEST_MAT)
         entity = Entity.from_excel(ENT_DEMO_TODAY)
-        entity.check()
+        #entity.check()
         entity.exposures.ref_year = 2018
         cost_ben = CostBenefit()
         cost_ben.calc(hazard, entity, future_year=2040, risk_func=risk_aai_agg,
@@ -644,7 +644,7 @@ class TestSteps(unittest.TestCase):
         """Test apply_risk_transfer with present and future"""
         hazard = Hazard.from_mat(HAZ_TEST_MAT)
         entity = Entity.from_excel(ENT_DEMO_TODAY)
-        entity.check()
+        #entity.check()
         entity.exposures.ref_year = 2018
 
         fut_ent = copy.deepcopy(entity)
@@ -700,7 +700,7 @@ class TestSteps(unittest.TestCase):
         """Test remove_measure method"""
         hazard = Hazard.from_mat(HAZ_TEST_MAT)
         entity = Entity.from_excel(ENT_DEMO_TODAY)
-        entity.check()
+        #entity.check()
         entity.exposures.ref_year = 2018
         cost_ben = CostBenefit()
         cost_ben.calc(hazard, entity, future_year=2040, risk_func=risk_aai_agg,
@@ -734,7 +734,7 @@ class TestCalc(unittest.TestCase):
 
         # future
         ent_future = Entity.from_excel(ENT_DEMO_FUTURE)
-        ent_future.check()
+        #ent_future.check()
         ent_future.exposures.ref_year = 2040
 
         haz_future = copy.deepcopy(hazard)
@@ -785,7 +785,7 @@ class TestCalc(unittest.TestCase):
         """Test calc without future change"""
         hazard = Hazard.from_mat(HAZ_TEST_MAT)
         entity = Entity.from_excel(ENT_DEMO_TODAY)
-        entity.check()
+        #entity.check()
         entity.exposures.ref_year = 2018
         cost_ben = CostBenefit()
         cost_ben.calc(hazard, entity, future_year=2040)
@@ -813,7 +813,7 @@ class TestRiskFuncs(unittest.TestCase):
 
     def test_impact(self):
         ent = Entity.from_excel(ENT_DEMO_TODAY)
-        ent.check()
+        #ent.check()
         hazard = Hazard.from_mat(HAZ_TEST_MAT)
         impact = Impact()
         ent.exposures.assign_centroids(hazard)

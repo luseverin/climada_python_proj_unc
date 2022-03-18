@@ -134,7 +134,7 @@ class TestReader(unittest.TestCase):
         """Test from_tracks with one input."""
         tc_track = TCTracks.from_processed_ibtracs_csv(TEST_TRACK_SHORT)
         tc_haz = TropCyclone.from_tracks(tc_track, centroids=CENTR_TEST_BRB)
-        tc_haz.check()
+        #tc_haz.check()
 
         self.assertEqual(tc_haz.tag.haz_type, 'TC')
         self.assertEqual(tc_haz.tag.description, '')

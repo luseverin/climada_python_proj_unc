@@ -198,6 +198,7 @@ class TestRemoveDupl(unittest.TestCase):
         haz1 = Hazard.from_excel(HAZ_TEMPLATE_XLS, haz_type='TC')
         haz2 = Hazard.from_excel(HAZ_TEMPLATE_XLS, haz_type='TC')
         haz1.append(haz2)
+        haz1.check()
         haz1.remove_duplicates()
         haz1.check()
         self.assertEqual(haz1.event_name, haz2.event_name)

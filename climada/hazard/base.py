@@ -207,6 +207,8 @@ class Hazard():
             elif not isinstance(var_val, Pool):
                 setattr(self, var_name, var_val.__class__())
 
+    import cherry_profiler as cp
+    @cp.track
     def check(self):
         """Check dimension of attributes.
 
@@ -354,6 +356,7 @@ class Hazard():
         if 'unit' in attrs:
             haz.unit = attrs['unit']
 
+        haz.check()
         return haz
 
     def set_raster(self, *args, **kwargs):
@@ -618,6 +621,7 @@ class Hazard():
             haz._read_att_mat(data, file_name, var_names)
         except KeyError as var_err:
             raise KeyError("Variable not in MAT file: " + str(var_err)) from var_err
+        haz.check()
         return haz
 
     def read_excel(self, *args, **kwargs):
@@ -663,6 +667,7 @@ class Hazard():
             haz._read_att_excel(file_name, var_names)
         except KeyError as var_err:
             raise KeyError("Variable not in Excel file: " + str(var_err)) from var_err
+        haz.check()
         return haz
 
     def select(self, event_names=None, date=None, orig=None, reg_id=None,
@@ -1236,6 +1241,7 @@ class Hazard():
                 setattr(haz, var_name, hf_data.get(var_name))
 
         hf_data.close()
+        haz.check()
         return haz
 
     def _set_coords_centroids(self):
@@ -1641,6 +1647,7 @@ class Hazard():
 
         self.centroids = centroids
         self.sanitize_event_ids()
+        self.remove_duplicates()
 
     @classmethod
     def concat(cls, haz_list):

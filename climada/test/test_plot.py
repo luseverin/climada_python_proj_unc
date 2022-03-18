@@ -92,9 +92,8 @@ class TestPlotter(unittest.TestCase):
 
     def test_exposures_value_pass(self):
         """Plot exposures values."""
-        myexp = pd.read_excel(ENT_DEMO_TODAY)
-        myexp = Exposures(myexp)
-        myexp.check()
+        myexp = Exposures.from_excel(ENT_DEMO_TODAY)
+        #myexp.check()
         myexp.tag.description = 'demo_today'
         myax = myexp.plot_hexbin()
         self.assertIn('demo_today', myax.get_title())
@@ -115,7 +114,7 @@ class TestPlotter(unittest.TestCase):
     def test_impact_pass(self):
         """Plot impact exceedence frequency curves."""
         myent = Entity.from_excel(ENT_DEMO_TODAY)
-        myent.exposures.check()
+        #myent.exposures.check()
         myhaz = Hazard.from_mat(HAZ_DEMO_MAT)
         myimp = Impact()
         myimp.calc(myent.exposures, myent.impact_funcs, myhaz)
