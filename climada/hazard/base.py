@@ -208,7 +208,7 @@ class Hazard():
                 setattr(self, var_name, var_val.__class__())
 
     import cherry_profiler as cp
-    @cp.track
+    @cp.track()
     def check(self):
         """Check dimension of attributes.
 

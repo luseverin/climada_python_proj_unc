@@ -262,7 +262,7 @@ class ImpactFuncSet():
         return sum(len(vul_list) for vul_list in self.get_ids().values())
 
     import cherry_profiler as cp
-    @cp.track
+    @cp.track()
     def check(self):
         """Check instance attributes.
 

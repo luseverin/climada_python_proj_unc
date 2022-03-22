@@ -226,7 +226,7 @@ class Exposures():
     __delitem__ = _access_item
 
     import cherry_profiler as cp
-    @cp.track
+    @cp.track()
     def check(self):
         """Check Exposures consistency.
 

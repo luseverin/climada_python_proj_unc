@@ -113,7 +113,7 @@ class ImpactFunc():
         return axis
 
     import cherry_profiler as cp
-    @cp.track
+    @cp.track()
     def check(self):
         """Check consistent instance data.
 

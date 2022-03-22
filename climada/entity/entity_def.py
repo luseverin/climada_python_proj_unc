@@ -147,7 +147,7 @@ class Entity(object):
         self.disc_rates.write_excel(file_name)
 
     import cherry_profiler as cp
-    @cp.track
+    @cp.track()
     def check(self):
         """Check instance attributes.
 

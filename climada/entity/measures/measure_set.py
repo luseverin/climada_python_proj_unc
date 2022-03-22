@@ -288,7 +288,7 @@ class MeasureSet():
         return sum(len(meas_list) for meas_list in self.get_names().values())
 
     import cherry_profiler as cp
-    @cp.track
+    @cp.track()
     def check(self):
         """Check instance attributes.
 
