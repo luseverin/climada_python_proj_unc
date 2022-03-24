@@ -221,7 +221,7 @@ class Measure():
         LOGGER.debug('Setting new hazard %s', self.hazard_set)
         from climada.hazard.base import Hazard
         new_haz = Hazard.from_hdf5(self.hazard_set)
-        new_haz.check()
+        #new_haz.check()
         return new_haz
 
     def _change_all_exposures(self, exposures):
@@ -244,11 +244,11 @@ class Measure():
         if isinstance(self.exposures_set, (str, Path)):
             LOGGER.debug('Setting new exposures %s', self.exposures_set)
             new_exp = Exposures.from_hdf5(self.exposures_set)
-            new_exp.check()
+            #new_exp.check()
         elif isinstance(self.exposures_set, Exposures):
             LOGGER.debug('Setting new exposures. ')
             new_exp = self.exposures_set.copy(deep=True)
-            new_exp.check()
+            #new_exp.check()
         else:
             raise ValueError(f'{self.exposures_set} is neither a string nor an Exposures object')
 

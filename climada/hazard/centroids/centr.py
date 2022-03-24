@@ -253,6 +253,7 @@ class Centroids():
             except KeyError:
                 pass
 
+        centroids.check()
         return centroids
 
     def set_raster_from_pix_bounds(self, *args, **kwargs):
@@ -361,6 +362,7 @@ class Centroids():
         centr.lat = np.asarray(lat)
         centr.lon = np.asarray(lon)
         centr.geometry = gpd.GeoSeries(crs=crs)
+        centr.check()
         return centr
 
     def set_raster_file(self, file_name, band=None, **kwargs):
@@ -644,6 +646,7 @@ class Centroids():
         except KeyError as err:
             raise KeyError("Not existing variable: %s" % str(err)) from err
 
+        centr.check()
         return centr
 
     def clear(self):

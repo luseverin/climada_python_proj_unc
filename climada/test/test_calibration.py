@@ -40,9 +40,7 @@ class TestCalib(unittest.TestCase):
     def test_calib_instance(self):
         """Test save calib instance"""
          # Read default entity values
-        ent = Entity()
-        ent.read_excel(ENT_DEMO_TODAY)
-        ent.check()
+        ent = Entity.from_excel(ENT_DEMO_TODAY)
 
         # Read default hazard file
         hazard = Hazard.from_mat(HAZ_TEST_MAT)

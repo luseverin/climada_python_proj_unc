@@ -144,7 +144,7 @@ class DiscRates():
         ------
         ValueError
         """
-        disc_rates.check()
+        #disc_rates.check()
         if self.years.size == 0:
             self.__dict__ = copy.deepcopy(disc_rates.__dict__)
             return
@@ -258,7 +258,9 @@ class DiscRates():
         except KeyError as err:
             raise KeyError("Not existing variable: %s" % str(err)) from err
 
-        return cls(years=years, rates=rates, tag=tag)
+        disc_rates = cls(years=years, rates=rates, tag=tag)
+        disc_rates.check()
+        return disc_rates
 
     def read_mat(self, *args, **kwargs):
         """This function is deprecated, use DiscRates.from_mats instead."""
@@ -297,7 +299,9 @@ class DiscRates():
         except KeyError as err:
             raise KeyError("Not existing variable: %s" % str(err)) from err
 
-        return cls(years=years, rates=rates, tag=tag)
+        disc_rates = cls(years=years, rates=rates, tag=tag)
+        disc_rates.check()
+        return disc_rates
 
     def read_excel(self, *args, **kwargs):
         """This function is deprecated, use DiscRates.from_excel instead."""

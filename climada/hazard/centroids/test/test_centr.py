@@ -99,7 +99,7 @@ class TestCentroidsReader(unittest.TestCase):
         gdf['geom'] = gdf.geometry  # this should have no effect on centroids
 
         centroids = Centroids.from_geodataframe(gdf)
-        centroids.check()
+        #centroids.check()
 
         self.assertEqual(centroids.geometry.size, 45)
         self.assertEqual(centroids.lon[0], 32.57)

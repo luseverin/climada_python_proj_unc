@@ -142,7 +142,7 @@ class TestFuncs(unittest.TestCase):
     def test_assign_raster_same_pass(self):
         """Test assign_centroids with raster hazard"""
         exp = Exposures.from_raster(HAZ_DEMO_FL, window=Window(10, 20, 50, 60))
-        exp.check()
+        #exp.check()
         haz = Hazard.from_raster([HAZ_DEMO_FL], haz_type='FL', window=Window(10, 20, 50, 60))
         exp.assign_centroids(haz)
         np.testing.assert_array_equal(exp.gdf[INDICATOR_CENTR + 'FL'].values,

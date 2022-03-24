@@ -291,7 +291,7 @@ class ImpactFuncSet():
         ------
         ValueError
         """
-        impact_funcs.check()
+        #impact_funcs.check()
         if self.size() == 0:
             self.__dict__ = copy.deepcopy(impact_funcs.__dict__)
             return
@@ -368,6 +368,7 @@ class ImpactFuncSet():
         imp_func_set.tag.file_name = str(file_name)
         imp_func_set.tag.description = description
         imp_func_set._fill_dfr(dfr, var_names)
+        imp_func_set.check()
         return imp_func_set
 
     def read_excel(self, *args, **kwargs):

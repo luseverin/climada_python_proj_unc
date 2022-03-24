@@ -55,7 +55,7 @@ class TestCentroids(unittest.TestCase):
         from pathos.pools import ProcessPool as Pool
         pool = Pool()
         haz_fl = Hazard.from_raster([HAZ_DEMO_FL], haz_type='FL', pool=pool)
-        haz_fl.check()
+        #haz_fl.check()
 
         self.assertEqual(haz_fl.intensity.shape, (1, 1032226))
         self.assertEqual(haz_fl.intensity.min(), -9999.0)
@@ -74,7 +74,7 @@ class TestCentroids(unittest.TestCase):
         haz_fl.intensity = sparse.csr_matrix(np.array([0.5, 0.2, 0.1]))
         haz_fl.fraction = sparse.csr_matrix(np.array([0.5, 0.2, 0.1]) / 2)
         haz_fl.centroids = Centroids.from_lat_lon(np.array([1, 2, 3]), np.array([1, 2, 3]))
-        haz_fl.check()
+        #haz_fl.check()
 
         haz_fl.write_raster(DATA_DIR.joinpath('test_write_hazard.tif'))
 
@@ -94,7 +94,7 @@ class TestCentroids(unittest.TestCase):
         haz_fl.intensity = sparse.csr_matrix(np.array([0.5, 0.2, 0.1]))
         haz_fl.fraction = sparse.csr_matrix(np.array([0.5, 0.2, 0.1]) / 2)
         haz_fl.centroids = Centroids.from_lat_lon(np.array([1, 2, 3]), np.array([1, 2, 3]))
-        haz_fl.check()
+        #haz_fl.check()
 
         haz_fl.write_raster(DATA_DIR.joinpath('test_write_hazard.tif'), intensity=False)
 

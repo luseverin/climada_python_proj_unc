@@ -128,7 +128,7 @@ class TestOneExposure(unittest.TestCase):
         # Read demo entity values
         # Set the entity default file to the demo one
         ent = Entity.from_excel(ENT_DEMO_TODAY)
-        ent.check()
+        #ent.check()
 
         # Read default hazard file
         hazard = Hazard.from_mat(HAZ_TEST_MAT)
@@ -184,7 +184,7 @@ class TestCalc(unittest.TestCase):
         """Test result against reference value"""
         # Read default entity values
         ent = Entity.from_excel(ENT_DEMO_TODAY)
-        ent.check()
+        #ent.check()
 
         # Read default hazard file
         hazard = Hazard.from_mat(HAZ_TEST_MAT)
@@ -226,7 +226,7 @@ class TestCalc(unittest.TestCase):
         """Test save imp_mat"""
         # Read default entity values
         ent = Entity.from_excel(ENT_DEMO_TODAY)
-        ent.check()
+        #ent.check()
 
         # Read default hazard file
         hazard = Hazard.from_mat(HAZ_TEST_MAT)
@@ -426,7 +426,7 @@ class TestIO(unittest.TestCase):
     def test_excel_io(self):
         """Test write and read in excel"""
         ent = Entity.from_excel(ENT_DEMO_TODAY)
-        ent.check()
+        #ent.check()
 
         hazard = Hazard.from_mat(HAZ_TEST_MAT)
 
@@ -475,7 +475,7 @@ class TestRPmatrix(unittest.TestCase):
         """Test calc local impacts per return period"""
         # Read default entity values
         ent = Entity.from_excel(ENT_DEMO_TODAY)
-        ent.check()
+        #ent.check()
 
         # Read default hazard file
         hazard = Hazard.from_mat(HAZ_TEST_MAT)
@@ -665,7 +665,7 @@ class TestSelect(unittest.TestCase):
 
         # Read default entity values
         ent = Entity.from_excel(ENT_DEMO_TODAY)
-        ent.check()
+        #ent.check()
 
         # Read default hazard file
         hazard = Hazard.from_mat(HAZ_TEST_MAT)
