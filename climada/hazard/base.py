@@ -1782,6 +1782,11 @@ class Hazard():
                     ))
 
         return haz_new_cent
+        
+    @property
+    def cent_exp_col(self):
+        from climada.entity.exposures import INDICATOR_CENTR
+        return INDICATOR_CENTR + self.tag.haz_type
 
     @property
     def centr_exp_col(self):
