@@ -268,6 +268,7 @@ def impact_from_sample(imp, years, sampling_vec):
     imp_mat = extract_event_matrix(mat=impact.imp_mat, sampling_vec=sampling_vec)
     impact = impact.set_imp_mat(imp_mat)
     impact.event_id = np.arange(1, len(impact.at_event) + 1)
+    impact.event_name = list(np.array(imp.event_name)[np.concatenate(sampling_vec)])
     return impact
 
 
