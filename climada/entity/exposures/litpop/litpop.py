@@ -554,6 +554,79 @@ class LitPop(Exposures):
             exp.meta = {'crs': exp.crs}
         return exp
 
+    def _apply_ssp_to_litpop(self, future_year=2050, ssp_scenario=1):
+        """
+        This method can be used to scale current LitPop file to match a LitPop file
+        representing assets in future_year under ssp_scenario. Current LitPop file is
+        scaled by the change in population and GDP development (socioeconomic development)
+        in respect to its original exponents. The scaling factors are calculated by the
+        difference of population count and GDP per country of the reference year to the
+        defined future year. Data for the future GDPs and Population counts per country
+        are taken from the Shared Socioeconomic Pathways Scenario Database (SSP) developed
+        by the OECD and published on the webpage from the International Institute for
+        Applied Systems Analysis.
+        Attention: Country based future data is not available for Andorra, Antigua & Barbuda,
+        Dominica, Grenada, Saint Kitts & Nevis, Kirbati, Federated States of Micronesia,
+        Palau, Democratic People's Republic of Korea (North Korea) and Liberia.
+
+        Parameters
+        ----------
+        future_year : int
+            year between 2000 and 2100.
+            Default: 2050
+        ssp_scenario : int
+            1 for SSP1, 2 for SSP2, 3 for SSP3, 4 for SSP4 and 5 for SSP5.
+            Default: 1.
+
+        Returns
+        -------
+        litpop_fut : climada.entity.exposure.LitPop
+            LitPop file corrected asset/population values corresponding to the specified
+            future year and SSP scenario.
+        """
+        # Read Data for future Population and GDP
+        POP_SSP = SYSTEM_DIR.joinpath('Population_values_SSP.csv')
+        GDP_SSP = SYSTEM_DIR.joinpath('GDP_values_SSP.csv')
+
+        pop_table = pd.read_csv(POP_SSP)
+        gdp_table = pd.read_csv(GDP_SSP)
+        # Copy existing LitPop file
+        litpop = copy.deepcopy(self)
+        # Find exponents of LitPop file
+        gdp_exponent = int(litpop.tag.description[litpop.tag.description.find('[') + 1])
+        pop_exponent = int(litpop.tag.description[litpop.tag.description.find(']') - 1])
+        # Find reference year of LitPop file and round it to 5 years
+        ref_year = 5 * round(litpop.ref_year / 5)
+        # Make string from scenario input
+        scen = ('SSP' + str(ssp_scenario))
+        # Get country id per gdf point
+        country_ids = litpop.gdf.region_id.array
+        # Create empty arrays for toady's and future values
+        pop_tdy = np.ones(len(country_ids))
+        pop_fut = np.ones(len(country_ids))
+        gdp_tdy = np.ones(len(country_ids))
+        gdp_fut = np.ones(len(country_ids))
+        # Read Population & GDP values from tables for defined scenario, region and year
+        for i in range(0, len(country_ids)):
+            pop_tdy[i] = pop_table.loc[(pop_table['SCENARIO'] == scen) & (pop_table['REGION_ID'] == country_ids[i])][
+                str(ref_year)]
+            pop_fut[i] = pop_table.loc[(pop_table['SCENARIO'] == scen) & (pop_table['REGION_ID'] == country_ids[i])][
+                str(future_year)]
+            gdp_tdy[i] = gdp_table.loc[(gdp_table['SCENARIO'] == scen) & (gdp_table['REGION_ID'] == country_ids[i])][
+                str(ref_year)]
+            gdp_fut[i] = gdp_table.loc[(gdp_table['SCENARIO'] == scen) & (gdp_table['REGION_ID'] == country_ids[i])][
+                str(future_year)]
+
+        # Compute the relative changes of Population & GDP from reference to defined future year
+        pop_factors = pop_fut / pop_tdy
+        gdp_factors = gdp_fut / gdp_tdy
+        # Multiply original LitPop values with relative changes of Population & GDP according to the original exponents
+        litpop_fut = Litpop()
+        litpop_fut.gdf.value = litpop.gdf.value * (gdp_factors ** gdp_exponent) * (pop_factors ** pop_exponent)
+        # Set ref_year to future year
+        litpop_fut.ref_year = future_year
+        return litpop_fut
+
     @staticmethod
     def _from_country(country, res_arcsec=30, exponents=(1,1), fin_mode=None,
                          total_value=None, reference_year=DEF_REF_YEAR,
@@ -1190,3 +1263,4 @@ def _calc_admin1_one_country(country, res_arcsec, exponents, fin_mode, total_val
         exp_list[-1].gdf['admin1'] = record['name']
 
     return Exposures.concat(exp_list)
+
