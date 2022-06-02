@@ -170,17 +170,32 @@ def impact_pnt_agg(impact_pnt, exp_pnt, agg_met):
     """
     exp_pnt_gdf = exp_pnt.gdf
     # aggregate impact
-    mat_agg = _aggregate_impact_mat(impact_pnt, exp_pnt_gdf, agg_met)
-
-
-    # write to impact obj
-    impact_agg = _set_agg_imp_mat(impact_pnt, mat_agg)
+    mat_agg = _aggregate_impact_mat(impact_pnt.imp_mat, exp_pnt_gdf, agg_met)
+    eai_exp = ImpactCalc.eai_exp_from_mat(mat_agg, impact_pnt.frequency)
+    at_event = ImpactCalc.at_event_from_mat(mat_agg)
+    aai_agg = ImpactCalc.aai_agg_from_eai_exp(eai_exp)
 
     # add exposure representation points as coordinates
     repr_pnts = gpd.GeoSeries(
         exp_pnt_gdf['geometry_orig'][:,0].apply(
             lambda x: x.representative_point()))
-    impact_agg.coord_exp = np.array([repr_pnts.y, repr_pnts.x]).transpose()
+    coord_exp = np.array([repr_pnts.y, repr_pnts.x]).transpose()
+    tag = copy.deep_copy(impact_pnt.tag)
+
+    impact_agg = Impact(
+        event_id=impact_pnt.event_it,
+        event_name=impact_pnt.event_name,
+        date=impact_pnt.date,
+        frequency=impact_pnt.frequency,
+        coord_exp=coord_exp,
+        crs=impact_pnt.crs,
+        eai_exp=eai_exp,
+        at_event=at_event,
+        tot_value=impact_pnt.tot_value,
+        aai_agg=aai_agg,
+        unit=impact_pnt.unit,
+        imp_mat=mat_agg,
+        tag=tag)
 
     # Add original geometries for plotting
     impact_agg.geom_exp = exp_pnt_gdf.xs(0, level=1)\
@@ -190,15 +205,15 @@ def impact_pnt_agg(impact_pnt, exp_pnt, agg_met):
     return impact_agg
 
 
-def _aggregate_impact_mat(imp_pnt, gdf_pnt, agg_met):
+def _aggregate_impact_mat(imp_mat_pnt, gdf_pnt, agg_met):
     """
     Aggregate point impact matrix given the geodataframe of disaggregated
     geometries.
 
     Parameters
     ----------
-    imp_pnt : Impact
-        Impact object with impact per point (rows of gdf_pnt)
+    imp_mat_pnt : scipy.sparse.csr_matrix
+        impact matrix with events x exposure points (rows of gdf_pnt)
     gdf_pnt : gpd.GeoDataFrame
         Exposures geodataframe with a multi-index, as obtained from disaggregation
         method exp_geom_to_pnt(). First level indicating
@@ -231,32 +246,8 @@ def _aggregate_impact_mat(imp_pnt, gdf_pnt, agg_met):
         (mask, (row_pnt, col_geom)),
          shape=(len(row_pnt), len(np.unique(col_geom)))
         )
-    return imp_pnt.imp_mat.dot(csr_mask)
+    return imp_mat_pnt.dot(csr_mask)
 
-def _set_agg_imp_mat(impact, imp_mat):
-    """
-    Set Impact attributes from the impact matrix. Returns a copy.
-    Overwrites eai_exp, at_event, aai_agg, imp_mat.
-
-    Parameters
-    ----------
-    impact : Impact
-        Impact instance.
-    imp_mat : sparse.csr_matrix
-        matrix num_events x num_exp with impacts.
-
-    Returns
-    -------
-    imp : Impact
-        Copy of impact with eai_exp, at_event, aai_agg, imp_mat set.
-
-    """
-    imp = copy.deepcopy(impact)
-    imp.eai_exp = ImpactCalc.eai_exp_from_mat(imp_mat, imp.frequency)
-    imp.at_event = ImpactCalc.at_event_from_mat(imp_mat)
-    imp.aai_agg = ImpactCalc.aai_agg_from_at_event(imp.at_event, imp.frequency)
-    imp.imp_mat = imp_mat
-    return imp
 
 def calc_grid_impact(
         exp, impf_set, haz, grid, disagg_met=DisaggMethod.DIV, disagg_val=None,
@@ -321,8 +312,8 @@ def calc_grid_impact(
     exp_pnt.assign_centroids(haz)
 
     # compute point impact
-    impact_pnt = Impact()
-    impact_pnt.calc(exp_pnt, impf_set, haz, save_mat=True)
+    impcalc = ImpactCalc(exp, impf_set, haz)
+    impact_pnt = impcalc.impact(save_mat=True)
 
     # re-aggregate impact to original exposure geometry
     impact_agg = impact_pnt_agg(impact_pnt, exp_pnt, agg_met)
