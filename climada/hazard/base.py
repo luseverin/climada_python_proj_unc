@@ -665,8 +665,8 @@ class Hazard():
             raise KeyError("Variable not in Excel file: " + str(var_err)) from var_err
         return haz
 
-    def select(self, event_names=None, date=None, orig=None, reg_id=None,
-               extent=None, reset_frequency=False):
+    def select(self, event_names=None, event_id=None, date=None, orig=None,
+               reg_id=None, extent=None, reset_frequency=False):
         """Select events matching provided criteria
 
         The frequency of events may need to be recomputed (see `reset_frequency`)!
@@ -675,6 +675,8 @@ class Hazard():
         ----------
         event_names : list of str, optional
             Names of events.
+        event_id : list of int, optional
+            Id of events. Default is None.
         date : array-like of length 2 containing str or int, optional
             (initial date, final date) in string ISO format ('2011-01-02') or datetime
             ordinal integer.
@@ -717,7 +719,7 @@ class Hazard():
         if isinstance(orig, bool):
             sel_ev &= (self.orig.astype(bool) == orig)
             if not np.any(sel_ev):
-                LOGGER.info('No hazard with %s tracks.', str(orig))
+                LOGGER.info('No hazard with %s original events.', str(orig))
                 return None
 
         # filter events based on name
@@ -731,6 +733,15 @@ class Hazard():
                 LOGGER.info('No hazard with name %s', name)
                 return None
             sel_ev = sel_ev[new_sel]
+
+        # filter events based on id
+        if isinstance(event_id, list):
+            # preserves order of event_id
+            sel_ev = np.array([
+                np.argwhere(self.event_id == n)[0,0]
+                for n in event_id
+                if n in self.event_id[sel_ev]
+                ])
 
         # filter centroids
         sel_cen = self.centroids.select_mask(reg_id=reg_id, extent=extent)
@@ -1180,7 +1191,15 @@ class Hazard():
                 for i_ev, var_ev in enumerate(var_val):
                     hf_str[i_ev] = var_ev
             elif var_val is not None and var_name != 'pool':
-                hf_data.create_dataset(var_name, data=var_val)
+                try:
+                    hf_data.create_dataset(var_name, data=var_val)
+                except TypeError:
+                    LOGGER.warning(
+                        f"write_hdf5: the class member {var_name} is skipped, due to its "
+                        f"type, {var_val.__class__.__name__}, for which writing to hdf5 "
+                        "is not implemented. Reading this H5 file will probably lead to "
+                        f"{var_name} being set to its default value."
+                    )
         hf_data.close()
 
     def read_hdf5(self, *args, **kwargs):
@@ -1764,3 +1783,65 @@ class Hazard():
                     ))
 
         return haz_new_cent
+
+    @property
+    def cent_exp_col(self):
+        from climada.entity.exposures import INDICATOR_CENTR
+        return INDICATOR_CENTR + self.tag.haz_type
+
+    @property
+    def haz_type(self):
+        return self.tag.haz_type
+
+    def get_mdr(self, cent_idx, impf):
+        """
+        Return Mean Damage Ratio (mdr) for chosen centroids (cent_idx)
+        for given impact function.
+
+        Parameters
+        ----------
+        cent_idx : array-like
+            array of indices of chosen centroids from hazard
+        impf : ImpactFunc
+            impact function to compute mdr
+
+        Returns
+        -------
+        sparse.csr_matrix
+            sparse matrix (n_events x len(cent_idx)) with mdr values
+
+        """
+        uniq_cent_idx, indices = np.unique(cent_idx, return_inverse=True)      #costs about 30ms for small datasets
+        mdr = self.intensity[:, uniq_cent_idx]
+        if impf.calc_mdr(0) == 0:
+            mdr.data = impf.calc_mdr(mdr.data)
+        else:
+            LOGGER.warning("Impact function id=%d has mdr(0) != 0."
+            "The mean damage ratio must thus be computed for all values of"
+            "hazard intensity including 0 which can be very time consuming.",
+            impf.id)
+            raise NotImplementedError("Not yet implemented.")
+        return mdr[:, indices]
+
+    def get_paa(self, cent_idx, impf):
+        uniq_cent_idx, indices = np.unique(cent_idx, return_inverse=True)      #costs about 30ms for small datasets
+        paa = self.intensity[:, uniq_cent_idx]
+        paa.data = np.interp(paa.data, impf.intensity, impf.paa)
+        return paa[:, indices]
+
+    def get_fraction(self, cent_idx):
+        """
+        Return fraction for chosen centroids (cent_idx).
+
+        Parameters
+        ----------
+        cent_idx : array-like
+            array of indices of chosen centroids from hazard
+
+        Returns
+        -------
+        sparse.csr_matrix
+            sparse matrix (n_events x len(cent_idx)) with fraction values
+
+        """
+        return self.fraction[:, cent_idx]

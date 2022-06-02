@@ -19,7 +19,6 @@ with CLIMADA. If not, see <https://www.gnu.org/licenses/>.
 Test Impact class.
 """
 import unittest
-from pathlib import Path
 import numpy as np
 from scipy import sparse
 
@@ -35,7 +34,10 @@ import climada.engine.test as engine_test
 
 
 def get_haz_test_file(ds_name):
-    client = Client()
+    # As this module is part of the installation test suite, we want tom make sure it is running
+    # also in offline mode even when installing from pypi, where there is no test configuration.
+    # So we set cache_enabled explicitly to true
+    client = Client(cache_enabled=True)
     test_ds = client.get_dataset_info(name=ds_name, status='test_dataset')
     _, [haz_test_file] = client.download_dataset(test_ds)
     return haz_test_file
@@ -207,7 +209,7 @@ class TestCalc(unittest.TestCase):
         self.assertEqual(0, impact.at_event[0])
         self.assertEqual(0, impact.at_event[int(num_events / 2)])
         self.assertAlmostEqual(1.472482938320243e+08, impact.at_event[13809])
-        self.assertEqual(7.076504723057620e+10, impact.at_event[12147])
+        self.assertAlmostEqual(7.076504723057620e+10, impact.at_event[12147])
         self.assertEqual(0, impact.at_event[num_events - 1])
         # impact.eai_exp == EDS.ED_at_centroid in MATLAB
         self.assertEqual(num_exp, len(impact.eai_exp))
