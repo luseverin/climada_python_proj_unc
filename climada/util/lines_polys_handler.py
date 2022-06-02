@@ -29,7 +29,7 @@ import scipy as sp
 import shapely as sh
 import shapely.geometry as shgeom
 
-from climada.engine import Impact
+from climada.engine import Impact, ImpactCalc
 from climada.util import coordinates as u_coord
 
 LOGGER = logging.getLogger(__name__)
@@ -125,8 +125,8 @@ def calc_geom_impact(
     exp_pnt.assign_centroids(haz)
 
     # compute point impact
-    impact_pnt = Impact()
-    impact_pnt.calc(exp_pnt, impf_set, haz, save_mat=True)
+    impcalc = ImpactCalc(exp_pnt, impf_set, haz)
+    impact_pnt = impcalc.impact(save_mat=True)
 
     # re-aggregate impact to original exposure geometry
     impact_agg = impact_pnt_agg(impact_pnt, exp_pnt, agg_met)
@@ -173,7 +173,7 @@ def impact_pnt_agg(impact_pnt, exp_pnt_gdf, agg_met):
     mat_agg = _aggregate_impact_mat(impact_pnt, exp_pnt_gdf, agg_met)
 
     # write to impact obj
-    impact_agg = set_imp_mat(impact_pnt, mat_agg)
+    impact_agg = _set_agg_imp_mat(impact_pnt, mat_agg)
 
     # add exposure representation points as coordinates
     repr_pnts = gpd.GeoSeries(
@@ -972,9 +972,7 @@ def _swap_geom_cols(gdf, geom_to, new_geom):
     gdf_swap.set_geometry('geometry', inplace=True)
     return gdf_swap
 
-
-# TODO: To be removed in a future iteration and included directly into the impact class
-def set_imp_mat(impact, imp_mat):
+def _set_agg_imp_mat(impact, imp_mat):
     """
     Set Impact attributes from the impact matrix. Returns a copy.
     Overwrites eai_exp, at_event, aai_agg, imp_mat.
@@ -993,67 +991,9 @@ def set_imp_mat(impact, imp_mat):
 
     """
     imp = copy.deepcopy(impact)
-    imp.eai_exp = eai_exp_from_mat(imp_mat, imp.frequency)
-    imp.at_event = at_event_from_mat(imp_mat)
-    imp.aai_agg = aai_agg_from_at_event(imp.at_event, imp.frequency)
+    imp.eai_exp = ImpactCalc.eai_exp_from_mat(imp_mat, imp.frequency)
+    imp.at_event = ImpactCalc.at_event_from_mat(imp_mat)
+    imp.aai_agg = ImpactCalc.aai_agg_from_at_event(imp.at_event, imp.frequency)
     imp.imp_mat = imp_mat
     return imp
 
-
-def eai_exp_from_mat(imp_mat, freq):
-    """
-    Compute impact for each exposures from the total impact matrix
-
-    Parameters
-    ----------
-    imp_mat : sparse.csr_matrix
-        matrix num_events x num_exp with impacts.
-    frequency : np.array
-        annual frequency of events
-
-    Returns
-    -------
-    eai_exp : np.array
-        expected annual impact for each exposure
-
-    """
-    freq_mat = freq.reshape(len(freq), 1)
-    return imp_mat.multiply(freq_mat).sum(axis=0).A1
-
-
-def at_event_from_mat(imp_mat):
-    """
-    Compute impact for each hazard event from the total impact matrix
-
-    Parameters
-    ----------
-    imp_mat : sparse.csr_matrix
-        matrix num_events x num_exp with impacts.
-
-    Returns
-    -------
-    at_event : np.array
-        impact for each hazard event
-
-    """
-    return np.squeeze(np.asarray(np.sum(imp_mat, axis=1)))
-
-
-def aai_agg_from_at_event(at_event, freq):
-    """
-    Aggregate impact.at_event
-
-    Parameters
-    ----------
-    at_event : np.array
-        impact for each hazard event
-    frequency : np.array
-        annual frequency of event
-
-    Returns
-    -------
-    float
-        average annual impact aggregated
-
-    """
-    return sum(at_event * freq)
