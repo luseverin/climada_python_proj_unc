@@ -369,7 +369,8 @@ class Exposures():
         raise ValueError(f"Missing exposures impact functions {INDICATOR_IMPF}.")
 
     def assign_centroids(self, hazard, distance='euclidean',
-                         threshold=u_coord.NEAREST_NEIGHBOR_THRESHOLD):
+                         threshold=u_coord.NEAREST_NEIGHBOR_THRESHOLD,
+                         overwrite=True):
         """Assign for each exposure coordinate closest hazard coordinate.
         -1 used for disatances > threshold in point distances. If raster hazard,
         -1 used for centroids outside raster.
@@ -408,6 +409,15 @@ class Exposures():
         and works only for non-gridded data.
 
         """
+        haz_type = hazard.tag.haz_type
+        centr_haz = INDICATOR_CENTR + haz_type
+        if centr_haz in self.gdf:
+            LOGGER.info('Exposures matching centroids already found for %s', haz_type)
+            if overwrite:
+                LOGGER.info('Existing centroids will be overwritten for %s', haz_type)
+            else:
+                return None
+
         LOGGER.info('Matching %s exposures with %s centroids.',
                     str(self.gdf.shape[0]), str(hazard.centroids.size))
         if not u_coord.equal_crs(self.crs, hazard.centroids.crs):
@@ -421,7 +431,7 @@ class Exposures():
             assigned = u_coord.assign_coordinates(
                 np.stack([self.gdf.latitude.values, self.gdf.longitude.values], axis=1),
                 hazard.centroids.coord, distance=distance, threshold=threshold)
-        self.gdf[INDICATOR_CENTR + hazard.tag.haz_type] = assigned
+        self.gdf[centr_haz] = assigned
 
     def set_geometry_points(self, scheduler=None):
         """Set geometry attribute of GeoDataFrame with Points from latitude and
@@ -996,6 +1006,16 @@ class Exposures():
         ), crs=crs)
 
         return exp
+
+    def affected_values_gdf(self, hazard):
+        return self.gdf[(self.gdf.value != 0) & (self.gdf[hazard.cent_exp_col] >= 0)]
+
+    def affected_total_value(self, hazard):
+        nz_mask = (
+            (self.gdf.value.values > 0)
+            & (self.gdf[hazard.cent_exp_col].values >= 0)
+        )
+        return np.sum(self.gdf.value.values[nz_mask])
 
 
 def add_sea(exposures, sea_res, scheduler=None):
