@@ -21,6 +21,7 @@ import scipy as sp
 from numpy.random import default_rng
 
 import climada.util.dates_times as u_dt
+from climada.engine import Impact, ImpactCalc
 
 LOGGER = logging.getLogger(__name__)
 
@@ -236,7 +237,7 @@ def aggregate_impact_to_year(imp, exp=None):
     impact.tag['yimp object'] = True
     return impact
 
-
+#TODO: Adjust the tot_value, tag, event_name
 def impact_from_sample(imp, years, sampling_vec):
     """
     Set impact object from sample of events
@@ -262,13 +263,27 @@ def impact_from_sample(imp, years, sampling_vec):
     #    raise AttributeError("The impact matrix from imp.imp_mat is empty.")
 
     impact = copy.deepcopy(imp)
-    impact.date = year_date_event_in_sample(years=years, dates=impact.date,
+    date = year_date_event_in_sample(years=years, dates=impact.date,
                                             sampling_vec=sampling_vec)
-    impact.frequency = frequency_for_sample(sampling_vec)
+    frequency = frequency_for_sample(sampling_vec)
     imp_mat = extract_event_matrix(mat=impact.imp_mat, sampling_vec=sampling_vec)
-    impact = impact.set_imp_mat(imp_mat)
-    impact.event_id = np.arange(1, len(impact.at_event) + 1)
-    return impact
+    eai_exp = ImpactCalc.eai_exp_from_mat(imp_mat, frequency)
+    at_event = ImpactCalc.at_event_from_mat(imp_mat)
+    aai_agg = ImpactCalc.aai_agg_from_eai_exp(eai_exp)
+    event_id = np.arange(1, len(at_event) + 1)
+    return Impact(event_id=event_id,
+                  event_name=event_id.astype('str'),
+                  date=date,
+                  frequency=frequency,
+                  coord_exp=impact.coord_exp,
+                  crs=impact.crs,
+                  eai_exp=eai_exp,
+                  at_event=at_event,
+                  tot_value=impact.tot_value,
+                  aai_agg=aai_agg,
+                  unit='',
+                  imp_mat=imp_mat,
+                  tag=impact.tag)
 
 
 def extract_event_matrix(mat, sampling_vec):
