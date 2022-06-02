@@ -134,7 +134,7 @@ def calc_geom_impact(
     return impact_agg
 
 
-def impact_pnt_agg(impact_pnt, exp_pnt_gdf, agg_met):
+def impact_pnt_agg(impact_pnt, exp_pnt, agg_met):
     """
     Aggregate the impact per geometry.
 
@@ -145,8 +145,8 @@ def impact_pnt_agg(impact_pnt, exp_pnt_gdf, agg_met):
     ----------
     impact_pnt : Impact
         Impact object with impact per exposure point (lines of exp_pnt)
-    exp_pnt_gdf : gpd.GeoDataFrame
-        Geodataframe of an exposures featuring a multi-index. First level indicating
+    exp_pnt : Exposures
+        Exposures with geodataframe featuring a multi-index. First level indicating
         membership of original geometries, second level the disaggregated points.
         The exposure is obtained for instance with the disaggregation method
         exp_geom_to_pnt().
@@ -168,9 +168,10 @@ def impact_pnt_agg(impact_pnt, exp_pnt_gdf, agg_met):
     --------
         exp_geom_to_pnt: exposures disaggregation method
     """
-
+    exp_pnt_gdf = exp_pnt.gdf
     # aggregate impact
     mat_agg = _aggregate_impact_mat(impact_pnt, exp_pnt_gdf, agg_met)
+
 
     # write to impact obj
     impact_agg = _set_agg_imp_mat(impact_pnt, mat_agg)
@@ -232,6 +233,30 @@ def _aggregate_impact_mat(imp_pnt, gdf_pnt, agg_met):
         )
     return imp_pnt.imp_mat.dot(csr_mask)
 
+def _set_agg_imp_mat(impact, imp_mat):
+    """
+    Set Impact attributes from the impact matrix. Returns a copy.
+    Overwrites eai_exp, at_event, aai_agg, imp_mat.
+
+    Parameters
+    ----------
+    impact : Impact
+        Impact instance.
+    imp_mat : sparse.csr_matrix
+        matrix num_events x num_exp with impacts.
+
+    Returns
+    -------
+    imp : Impact
+        Copy of impact with eai_exp, at_event, aai_agg, imp_mat set.
+
+    """
+    imp = copy.deepcopy(impact)
+    imp.eai_exp = ImpactCalc.eai_exp_from_mat(imp_mat, imp.frequency)
+    imp.at_event = ImpactCalc.at_event_from_mat(imp_mat)
+    imp.aai_agg = ImpactCalc.aai_agg_from_at_event(imp.at_event, imp.frequency)
+    imp.imp_mat = imp_mat
+    return imp
 
 def calc_grid_impact(
         exp, impf_set, haz, grid, disagg_met=DisaggMethod.DIV, disagg_val=None,
@@ -972,28 +997,5 @@ def _swap_geom_cols(gdf, geom_to, new_geom):
     gdf_swap.set_geometry('geometry', inplace=True)
     return gdf_swap
 
-def _set_agg_imp_mat(impact, imp_mat):
-    """
-    Set Impact attributes from the impact matrix. Returns a copy.
-    Overwrites eai_exp, at_event, aai_agg, imp_mat.
 
-    Parameters
-    ----------
-    impact : Impact
-        Impact instance.
-    imp_mat : sparse.csr_matrix
-        matrix num_events x num_exp with impacts.
-
-    Returns
-    -------
-    imp : Impact
-        Copy of impact with eai_exp, at_event, aai_agg, imp_mat set.
-
-    """
-    imp = copy.deepcopy(impact)
-    imp.eai_exp = ImpactCalc.eai_exp_from_mat(imp_mat, imp.frequency)
-    imp.at_event = ImpactCalc.at_event_from_mat(imp_mat)
-    imp.aai_agg = ImpactCalc.aai_agg_from_at_event(imp.at_event, imp.frequency)
-    imp.imp_mat = imp_mat
-    return imp
 
