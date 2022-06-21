@@ -119,6 +119,7 @@ def order_climate_driver(impact, n_events, list_climate_models=None, list_years=
     impact_ordered.frequency = np.ones(len(impact_ordered.event_name))/len(impact_ordered.event_name)
     impact_ordered = impact_ordered.set_imp_mat(impact_ordered.imp_mat)
     impact_ordered.coord_exp = impact.coord_exp
+    impact_ordered.event_id = np.arange(len(impact_ordered.event_name))
     return impact_ordered
 
 
