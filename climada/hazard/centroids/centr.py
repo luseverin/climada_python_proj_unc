@@ -116,6 +116,8 @@ class Centroids():
         self.region_id = np.array([])
         self.elevation = np.array([])
 
+    import cherry_profiler as cp
+    @cp.track()
     def check(self):
         """Check integrity of stored information.
 

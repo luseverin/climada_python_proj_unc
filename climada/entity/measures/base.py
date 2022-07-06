@@ -108,6 +108,8 @@ class Measure():
         self.risk_transf_cover = 0
         self.risk_transf_cost_factor = 1
 
+    import cherry_profiler as cp
+    @cp.track()
     def check(self):
         """
         Check consistent instance data.

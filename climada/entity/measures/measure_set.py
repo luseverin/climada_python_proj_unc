@@ -287,6 +287,8 @@ class MeasureSet():
             return len(self.get_measure(haz_type, name))
         return sum(len(meas_list) for meas_list in self.get_names().values())
 
+    import cherry_profiler as cp
+    @cp.track()
     def check(self):
         """Check instance attributes.
 

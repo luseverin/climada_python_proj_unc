@@ -98,6 +98,8 @@ class DiscRates():
         self.years = np.array([], int)
         self.rates = np.array([], float)
 
+    import cherry_profiler as cp
+    @cp.track()
     def check(self):
         """
         Check attributes consistency.
