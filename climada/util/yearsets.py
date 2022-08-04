@@ -21,6 +21,7 @@ import scipy as sp
 from numpy.random import default_rng
 
 import climada.util.dates_times as u_dt
+from climada.engine import ImpactCalc
 
 LOGGER = logging.getLogger(__name__)
 
@@ -266,7 +267,7 @@ def impact_from_sample(imp, years, sampling_vec):
                                             sampling_vec=sampling_vec)
     impact.frequency = frequency_for_sample(sampling_vec)
     imp_mat = extract_event_matrix(mat=impact.imp_mat, sampling_vec=sampling_vec)
-    impact = impact.set_imp_mat(imp_mat)
+    impact = set_imp_mat(impact, imp_mat)
     impact.event_id = np.arange(1, len(impact.at_event) + 1)
     impact.event_name = list(np.array(imp.event_name)[np.concatenate(sampling_vec)])
     return impact
@@ -468,6 +469,28 @@ def compute_imp_per_year(imp, sampling_vect):
                     sampling_vect]
 
     return imp_per_year
+
+
+def set_imp_mat(impact, imp_mat):
+    """
+    Set Impact attributes from the impact matrix. Returns a copy.
+    Overwrites eai_exp, at_event, aai_agg, imp_mat
+
+    Parameters
+    ----------
+    impact: Impact
+    imp_mat : sparse.csr_matrix
+        matrix num_events x num_exp with impacts.
+    Returns
+    -------
+    imp : Impact
+        Copy of impact with eai_exp, at_event, aai_agg, imp_mat set.
+    """
+    imp = copy.deepcopy(impact)
+    imp.at_event, imp.eai_exp, imp.aai_agg = ImpactCalc.risk_metrics(imp_mat, imp.frequency)
+    imp.imp_mat = imp_mat
+    return imp
+
 
 def calculate_correction_fac(imp_per_year, imp):
     """Calculate a correction factor that can be used to scale the yimp in such
