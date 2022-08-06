@@ -129,8 +129,14 @@ def aggregate_impact_from_event_name(imp, how='sum', exp=None):
     #    raise AttributeError("The impact matrix from imp.imp_mat is empty.")
 
     impact = copy.deepcopy(imp)
+
+    imp_mat = imp.imp_mat
+    mask =[np.ma.make_mask(np.array(imp.event_name) == event).astype(int)
+           for event in np.unique(imp.event_name)]
+    mask_matrix =  sp.sparse.csr_matrix(mask)
+
     if how == 'sum':
-        imp_mat = sum_impact_by_event_name(impact)
+        imp_mat = mask_matrix.dot(imp_mat)
     elif how == 'max':
         imp_mat = sp.sparse.csr_matrix(sp.sparse.vstack(
         [impact.imp_mat[(np.array(imp.event_name) == event).astype(bool)].max(axis=0)
