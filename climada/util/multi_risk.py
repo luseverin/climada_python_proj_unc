@@ -30,26 +30,32 @@ from climada.util.yearsets import set_imp_mat
 def get_indices_drivers(impact, n_events, list_string1, list_string2):
     """Return the indices of the event names ordered based on the given lists of strings."""
 
-    indices = {str2: {str1: np.unique([i for i, elem in enumerate(impact.event_name) if
-                                                ((str(str2) in elem) & (str(str1) in elem))]) for str1 in list_string1} for
-               str2 in list_string2}
     combinations = 1
     if type(list_string1) is list:
         combinations = len(list_string1)
+    else:
+        list_string1 = []
     if type(list_string2) is list:
         combinations = combinations*len(list_string2)
+    else:
+        list_string2 = []
+
+    indices = {str2: {str1: np.unique([i for i, elem in enumerate(impact.event_name) if
+                                       ((str(str2) in elem) & (str(str1) in elem))]) for str1 in list_string1} for
+               str2 in list_string2}
+
     n_samples = n_events/combinations
 
     if not n_samples.is_integer():
         raise ValueError("Please provide a number of events that can be divided by the number of combination")
     else:
         n_samples = int(n_samples)
-    indices = [np.random.choice(indices[model][year]) for model in list_string2 for year in list_string1 for
+    indices = [np.random.choice(indices[str2][str1]) for str2 in list_string2 for str1 in list_string1 for
                n in range(n_samples)]
     return indices
 
 
-def order_events_by_name(impact, n_events=1, list_string1=None, list_string2=None):
+def order_events_by_name(impact, indices, list_string1=None, list_string2=None):
     """
     Order event names based on given strings contained in the event names.
 
@@ -81,7 +87,6 @@ def order_events_by_name(impact, n_events=1, list_string1=None, list_string2=Non
     """
     if list_string1 is None and list_string2 is None:
         raise ValueError('provide at least one list of string to use to order the events')
-    indices = get_indices_drivers(impact, n_events, list_string1=list_string1, list_string2=list_string2)
     impact_ordered = Impact()
     impact_ordered.imp_mat = impact.imp_mat[indices]
     impact_ordered.event_name = [impact.event_name[index] for index in indices]
@@ -128,53 +133,31 @@ def aggregate_impact_from_event_name(imp, how='sum', exp=None):
     #if imp.imp_mat.nnz == 0:
     #    raise AttributeError("The impact matrix from imp.imp_mat is empty.")
 
-    impact = copy.deepcopy(imp)
-
-    imp_mat = imp.imp_mat
-    mask =[np.ma.make_mask(np.array(imp.event_name) == event).astype(int)
-           for event in np.unique(imp.event_name)]
-    mask_matrix =  sp.sparse.csr_matrix(mask)
-
     if how == 'sum':
+        imp_mat = imp.imp_mat
+        mask = [np.ma.make_mask(np.array(imp.event_name) == event).astype(int)
+                for event in np.unique(imp.event_name)]
+        mask_matrix = sp.sparse.csr_matrix(mask)
+
         imp_mat = mask_matrix.dot(imp_mat)
+
     elif how == 'max':
         imp_mat = sp.sparse.csr_matrix(sp.sparse.vstack(
-        [impact.imp_mat[(np.array(imp.event_name) == event).astype(bool)].max(axis=0)
-         for event in np.unique(impact.event_name)]))
+        [imp.imp_mat[(np.array(imp.event_name) == event).astype(bool)].max(axis=0)
+         for event in np.unique(imp.event_name)]))
 
     if exp is not None:
-        exp_mat = np.stack([exp.gdf.value.to_numpy() for n in np.unique(imp.event_name)])
-        imp_mat = sparse_min(imp_mat, exp_mat)
+        m1 = imp.imp_mat[imp.imp_mat.nonzero()]
+        m2 = np.matrix(exp.gdf.value[imp.imp_mat.nonzero()[1]])
+        imp.imp_mat[imp.imp_mat.nonzero()] = np.minimum(m1,m2)
 
-    impact.frequency = np.ones(imp_mat.shape[0])/imp_mat.shape[0]
-    impact = set_imp_mat(impact, imp_mat)
-    impact.date = np.arange(1, len(impact.at_event) + 1)
-    impact.event_id = np.arange(1, len(impact.at_event) + 1)
-    impact.event_name = np.unique(imp.event_name)
-    impact.tag['yimp object'] = True
-    return impact
-
-
-def sum_impact_by_event_name(imp):
-    """
-    Sum the impact for all events with the same name.
-    Parameters
-    ----------
-    imp : Impact
-        Impact with impact matrix and events over several years
-
-    Returns
-    -------
-    sp.sparse.csr_matrix
-        Impact matrix with one event per year
-
-    """
-    mat = imp.imp_mat
-    mask =[np.ma.make_mask(np.array(imp.event_name) == event).astype(int)
-           for event in np.unique(imp.event_name)]
-    mask_matrix =  sp.sparse.csr_matrix(mask)
-    sum_mat = mask_matrix.dot(mat)
-    return sum_mat
+    imp.frequency = np.ones(imp_mat.shape[0])/imp_mat.shape[0]
+    imp = set_imp_mat(imp, imp_mat)
+    imp.date = np.arange(1, len(imp.at_event) + 1)
+    imp.event_id = np.arange(1, len(imp.at_event) + 1)
+    imp.event_name = np.unique(imp.event_name)
+    imp.tag['yimp object'] = True
+    return imp
 
 
 def downscale_impact(impact, impact2):
@@ -213,23 +196,25 @@ def combine_yearly_impacts(impact_list, how='sum', exp=None):
     elif how == 'min':
         imp_mat_min = imp0.imp_mat
         for imp in impact_list[1:-1]:
-            imp_mat_min = imp_mat_min.minimum(imp.imp_mat)
+            imp_mat_min = imp_mat_min.min(imp.imp_mat)
         imp_mat = imp_mat_min
 
     elif how == 'max':
-        imp_mat_max = impact_list[0]
+        imp_mat_max = imp0.imp_mat
         for imp_mat in impact_list[1:-1]:
-            imp_mat_max = imp_mat_max.maximum(imp_mat)
+            imp_mat_max = imp_mat_max.max(imp_mat)
         imp_mat = imp_mat_max
     else:
         raise ValueError(f"'{how}' is not a valid method. The implemented methods are sum, max or min")
 
     if exp is not None:
-        exp_mat = np.stack([exp.gdf.value.to_numpy() for n in range(len(imp0.event_name))])
-        imp_mat = sparse_min(imp_mat, exp_mat)
+        m1 = imp_mat[imp_mat.nonzero()]
+        m2 = np.matrix(exp.gdf.value[imp_mat.nonzero()[1]])
+        imp_mat[imp_mat.nonzero()] = np.minimum(m1,m2)
 
-    imp = set_imp_mat(imp0, imp_mat)
-    return imp
+
+    imp0 = set_imp_mat(imp0, imp_mat)
+    return imp0
 
 
 def sample_events(impact, years, lam=1):
@@ -255,9 +240,25 @@ def make_yearset(impact, years, exposures=None):
     return(yearset)
 
 
-def make_consistent_drivers_yearsets(impact_dict, n_events, list_string1=None, list_string2=None):
-    yearset_dict = \
-        {hazard: order_events_by_name(impact_dict[hazard], n_events, list_string1, list_string2) for hazard in impact_dict}
+def make_consistent_drivers_yearsets(impact_dict, n_events, same_indices=None, list_string1=None, list_string2=None):
+    yearset_dict = {}
+    event_names_list = []
+    indices_list = []
+    for i, hazard in enumerate(impact_dict):
+        if i ==0:
+            indices = get_indices_drivers(impact_dict[hazard], n_events,
+                                          list_string1=list_string1, list_string2=list_string2)
+        for n in range(i):
+            if list(impact_dict[hazard].event_name) == list(event_names_list[n]):
+                indices = indices_list[n]
+            else:
+                indices = get_indices_drivers(impact_dict[hazard], n_events,
+                                              list_string1=list_string1, list_string2=list_string2)
+        event_names_list.append(impact_dict[hazard].event_name)
+
+        indices_list.append(indices)
+        yearset_dict[hazard] = order_events_by_name(impact_dict[hazard], indices_list[i], list_string1,
+                                                    list_string2)
     return yearset_dict
 
 
@@ -287,3 +288,9 @@ def correlation_impacts_per_country(impact, countries):
                                                     country_matrices[combi[1]]), 'region_id': countries}
                            for combi in list(country_matrices.keys(), 2))
     return corr_df
+
+
+def normalize_data(data):
+    if np.sum(data)==0:
+        return data
+    return (data - np.min(data)) / (np.max(data) - np.min(data))
