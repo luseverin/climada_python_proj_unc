@@ -107,7 +107,7 @@ def sparse_min(A, B):
     return sp.sparse.csr_matrix(M)
 
 
-def aggregate_impact_from_event_name(imp, how='sum', exp=None):
+def aggregate_impact_from_event_name(impact, how='sum', exp=None):
     """
     Aggregate the impact per year to make yearsets. Maximum impact per year
     at each exposure point is exposure value if exp is not None.
@@ -133,6 +133,7 @@ def aggregate_impact_from_event_name(imp, how='sum', exp=None):
     #if imp.imp_mat.nnz == 0:
     #    raise AttributeError("The impact matrix from imp.imp_mat is empty.")
 
+    imp = copy.deepcopy((impact))
     if how == 'sum':
         imp_mat = imp.imp_mat
         mask = [np.ma.make_mask(np.array(imp.event_name) == event).astype(int)
@@ -171,7 +172,6 @@ def downscale_impact(impact, impact2):
     return new_impact
 
 
-
 def combine_yearly_impacts(impact_list, how='sum', exp=None):
     """
     Parameters
@@ -191,17 +191,23 @@ def combine_yearly_impacts(impact_list, how='sum', exp=None):
     imp0 = copy.deepcopy(impact_list[0])
 
     if how == 'sum':
-        imp_mat = np.sum([impact.imp_mat for impact in impact_list], axis=0)
+        imp_mat = imp0.imp_mat
+
+        for imp in impact_list[1:]:
+            print(impact_list)
+            imp_mat = imp_mat + imp.imp_mat
 
     elif how == 'min':
         imp_mat_min = imp0.imp_mat
-        for imp in impact_list[1:-1]:
-            imp_mat_min = imp_mat_min.min(imp.imp_mat)
+        for imp in impact_list[1:]:
+            print(impact_list)
+            imp_mat_min = imp_mat_min.minimum(imp.imp_mat)
         imp_mat = imp_mat_min
 
     elif how == 'max':
         imp_mat_max = imp0.imp_mat
-        for imp_mat in impact_list[1:-1]:
+        for imp_mat in impact_list[1:]:
+            print(impact_list)
             imp_mat_max = imp_mat_max.max(imp_mat)
         imp_mat = imp_mat_max
     else:
@@ -211,7 +217,6 @@ def combine_yearly_impacts(impact_list, how='sum', exp=None):
         m1 = imp_mat[imp_mat.nonzero()]
         m2 = np.matrix(exp.gdf.value[imp_mat.nonzero()[1]])
         imp_mat[imp_mat.nonzero()] = np.minimum(m1,m2)
-
 
     imp0 = set_imp_mat(imp0, imp_mat)
     return imp0
