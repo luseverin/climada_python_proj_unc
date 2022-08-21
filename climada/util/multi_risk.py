@@ -191,11 +191,7 @@ def combine_yearly_impacts(impact_list, how='sum', exp=None):
     imp0 = copy.deepcopy(impact_list[0])
 
     if how == 'sum':
-        imp_mat = imp0.imp_mat
-
-        for imp in impact_list[1:]:
-            print(impact_list)
-            imp_mat = imp_mat + imp.imp_mat
+        imp_mat = np.sum([impact.imp_mat for impact in impact_list], axis=0)
 
     elif how == 'min':
         imp_mat_min = imp0.imp_mat
@@ -208,7 +204,7 @@ def combine_yearly_impacts(impact_list, how='sum', exp=None):
         imp_mat_max = imp0.imp_mat
         for imp_mat in impact_list[1:]:
             print(impact_list)
-            imp_mat_max = imp_mat_max.max(imp_mat)
+            imp_mat_max = imp_mat_max.maximum(imp.imp_mat)
         imp_mat = imp_mat_max
     else:
         raise ValueError(f"'{how}' is not a valid method. The implemented methods are sum, max or min")
