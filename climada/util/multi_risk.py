@@ -161,17 +161,6 @@ def aggregate_impact_from_event_name(impact, how='sum', exp=None):
     return imp
 
 
-def downscale_impact(impact, impact2):
-    new_imp_mat = griddata(impact.coord_exp,
-                           impact.imp_mat.todense().T, impact2.coord_exp,
-                           method='nearest').T
-
-    new_impact = copy.deepcopy(impact2)
-    new_imp_mat = new_imp_mat*(len(impact.coord_exp)/len(impact2.coord_exp))
-    new_impact = set_imp_mat(new_impact, csr_matrix(new_imp_mat))
-    return new_impact
-
-
 def combine_yearly_impacts(impact_list, how='sum', exp=None):
     """
     Parameters
@@ -191,19 +180,18 @@ def combine_yearly_impacts(impact_list, how='sum', exp=None):
     imp0 = copy.deepcopy(impact_list[0])
 
     if how == 'sum':
-        imp_mat = np.sum([impact.imp_mat for impact in impact_list], axis=0)
+
+        imp_mat = sp.sparse.csr_matrix(np.sum([impact.imp_mat.todense() for impact in impact_list], axis=0))
 
     elif how == 'min':
         imp_mat_min = imp0.imp_mat
         for imp in impact_list[1:]:
-            print(impact_list)
             imp_mat_min = imp_mat_min.minimum(imp.imp_mat)
         imp_mat = imp_mat_min
 
     elif how == 'max':
         imp_mat_max = imp0.imp_mat
         for imp_mat in impact_list[1:]:
-            print(impact_list)
             imp_mat_max = imp_mat_max.maximum(imp.imp_mat)
         imp_mat = imp_mat_max
     else:
