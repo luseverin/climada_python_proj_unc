@@ -201,6 +201,7 @@ def sum_impact_year_per_year(imp, exp=None):
         sum_mat = sparse_min(sum_mat, exp_mat)
     return sum_mat
 
+
 def aggregate_impact_to_year(imp, exp=None):
     """
     Aggregate the impact per year to make yearsets. Maximum impact per year
@@ -230,7 +231,7 @@ def aggregate_impact_to_year(imp, exp=None):
     impact = copy.deepcopy(imp)
     imp_mat = sum_impact_year_per_year(impact, exp)
     impact.frequency = np.ones(imp_mat.shape[0])/imp_mat.shape[0]
-    impact = set_imp_mat(imp_mat)
+    impact = set_imp_mat(impact,imp_mat)
     impact.date = np.unique(u_dt.str_to_date([str(date) + '-01-01' for date in years_from_imp(impact)]))
     impact.event_id = np.arange(1, len(impact.at_event) + 1)
     impact.event_name = impact.event_id
