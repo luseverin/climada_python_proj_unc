@@ -754,7 +754,7 @@ class TestAssign(unittest.TestCase):
         lons = np.arange(-160, 180+1, 20)
         lats = np.arange(-60, 60+1, 20)
         lats, lons = [arr.ravel() for arr in np.meshgrid(lats, lons)]
-        centroids = np.transpose([lats, lons])
+        centroids = np.transpose([lats, lons]).copy()  # `copy()` makes it F-contiguous
 
         # Define exposures
         exposures = np.array([
@@ -1031,6 +1031,14 @@ class TestGetGeodata(unittest.TestCase):
             self.assertTrue(np.all(region_id[:6] == 52))
             # 578 for Norway
             self.assertEqual(region_id_OSLO, np.array([578]))
+
+    def test_all_points_on_sea(self):
+        """Test country codes for unassignable coordinates (i.e., on sea)"""
+        lon = [-24.1 , -24.32634711, -24.55751498, -24.79698392]
+        lat = [87.3 , 87.23261237, 87.14440587, 87.04121094]
+        for gridded in [True, False]:
+            country_codes = u_coord.get_country_code(lat, lon, gridded=gridded)
+            self.assertTrue(np.all(country_codes == np.array([0, 0, 0, 0])))
 
     def test_get_admin1_info_pass(self):
         """test get_admin1_info()"""
