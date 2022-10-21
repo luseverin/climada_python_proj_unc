@@ -1744,7 +1744,7 @@ class Hazard():
                     haz.centroids = Centroids.from_hdf5(hf_data.get(var_name))
                 elif var_name == 'tag':
                     haz.tag.haz_type = u_hdf5.to_string(hf_data.get('haz_type')[0])
-                    haz.tag.file_name = u_hdf5.to_string(hf_data.get('file_name')[0])
+                    haz.tag.file_name = str(file_name)
                     haz.tag.description = u_hdf5.to_string(hf_data.get('description')[0])
                 elif isinstance(var_val, np.ndarray) and var_val.ndim == 1:
                     setattr(haz, var_name, np.array(hf_data.get(var_name)))

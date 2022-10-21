@@ -834,6 +834,7 @@ class Exposures():
             for key, val in metadata.items():
                 if key in type(exp)._metadata: # pylint: disable=protected-access
                     setattr(exp, key, val)
+        exp.tag.file_name = str(file_name)
         return exp
 
     def read_mat(self, *args, **kwargs):
