@@ -36,7 +36,7 @@ import matplotlib.animation as animation
 import pandas as pd
 import xlsxwriter
 from tqdm import tqdm
-from typing import Optional
+from typing import Optional, Any
 
 
 from climada.entity import Exposures, Tag
@@ -69,6 +69,8 @@ class Impact():
         ordinal 1 (ordinal format of datetime library)
     coord_exp : np.array
         exposures coordinates [lat, lon] (in degrees)
+    crs : Any, optional
+        coordinate reference system
     eai_exp : np.array
         expected impact for each exposure within a period of 1/frequency_unit
     at_event : np.array
@@ -96,7 +98,7 @@ class Impact():
         frequency: Optional[np.ndarray] = None,
         frequency_unit: str = DEF_FREQ_UNIT,
         coord_exp: Optional[np.ndarray] = None,
-        crs: DEF_CRS,
+        crs: Any = DEF_CRS,
         eai_exp: Optional[np.ndarray] = None,
         at_event: Optional[np.ndarray] = None,
         tot_value: float = 0,
