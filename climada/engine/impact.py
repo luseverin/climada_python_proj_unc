@@ -36,6 +36,7 @@ import matplotlib.animation as animation
 import pandas as pd
 import xlsxwriter
 from tqdm import tqdm
+from typing import Optional
 
 
 from climada.entity import Exposures, Tag
@@ -87,21 +88,23 @@ class Impact():
         only filled if save_mat is True in calc()
     """
 
-    def __init__(self,
-                 event_id=None,
-                 event_name=None,
-                 date=None,
-                 frequency=None,
-                 frequency_unit=DEF_FREQ_UNIT,
-                 coord_exp=None,
-                 crs=DEF_CRS,
-                 eai_exp=None,
-                 at_event=None,
-                 tot_value=0,
-                 aai_agg=0,
-                 unit='',
-                 imp_mat=None,
-                 tag=None):
+    def __init__(
+        self,
+        event_id: Optional[np.ndarray] = None,
+        event_name: Optional[List[str]] = None,
+        date: Optional[np.ndarray] = None,
+        frequency: Optional[np.ndarray] = None,
+        frequency_unit: str = DEF_FREQ_UNIT,
+        coord_exp: Optional[np.ndarray] = None,
+        crs: DEF_CRS,
+        eai_exp: Optional[np.ndarray] = None,
+        at_event: Optional[np.ndarray] = None,
+        tot_value: float = 0,
+        aai_agg: float =0,
+        unit: str='',
+        imp_mat: Optional[sparse.csr_matrix] = None,
+        tag: Optional[dict] = None
+    ):
         """
         Init Impact object
 
