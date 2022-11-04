@@ -76,7 +76,7 @@ class TestDataAvail(unittest.TestCase):
 
     def test_ne_api_pass(self):
         """Test Natural Earth API"""
-        url = 'http://naciscdn.org/naturalearth/10m/cultural/ne_10m_admin_0_countries.zip'
+        url = 'https://naturalearth.s3.amazonaws.com/10m_cultural/ne_10m_admin_0_countries.zip'
         file_down = download_file(url)
         Path(file_down).unlink()
 
@@ -84,7 +84,7 @@ class TestDataAvail(unittest.TestCase):
         download_ftp("/".join([IBTRACS_URL, IBTRACS_FILE]), IBTRACS_FILE)
         Path(IBTRACS_FILE).unlink()
 
-    def test_icon_forecast_download(self):
+    def test_icon_eu_forecast_download(self):
         """Test availability of DWD icon forecast."""
         run_datetime = dt.datetime.utcnow() - dt.timedelta(hours=5)
         run_datetime = run_datetime.replace(hour=run_datetime.hour//12*12,
@@ -96,9 +96,27 @@ class TestDataAvail(unittest.TestCase):
         delete_icon_grib(run_datetime,max_lead_time=1) #deletes icon_file
         self.assertFalse(Path(icon_file[0]).exists())
 
+    def test_icon_d2_forecast_download(self):
+        """Test availability of DWD icon forecast."""
+        run_datetime = dt.datetime.utcnow() - dt.timedelta(hours=5)
+        run_datetime = run_datetime.replace(hour=run_datetime.hour//12*12,
+                                            minute=0,
+                                            second=0,
+                                            microsecond=0)
+        icon_file = download_icon_grib(run_datetime,
+                                       model_name='icon-d2-eps',
+                                       max_lead_time=1)
+        self.assertEqual(len(icon_file), 1)
+        delete_icon_grib(run_datetime,
+                         model_name='icon-d2-eps',
+                         max_lead_time=1) #deletes icon_file
+        self.assertFalse(Path(icon_file[0]).exists())
+
     def test_icon_centroids_download(self):
         """Test availablility of DWD icon grid information."""
         grid_file = download_icon_centroids_file()
+        Path(grid_file).unlink()
+        grid_file = download_icon_centroids_file(model_name='icon-d2-eps')
         Path(grid_file).unlink()
 
 # Execute Tests

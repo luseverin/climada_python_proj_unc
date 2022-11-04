@@ -22,14 +22,15 @@ Define StormEurope class.
 __all__ = ['StormEurope']
 
 import bz2
+import datetime as dt
 import logging
 from pathlib import Path
+
 import numpy as np
 import xarray as xr
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import sparse
-import datetime as dt
 
 from climada.util.config import CONFIG
 from climada.hazard.base import Hazard
@@ -54,28 +55,28 @@ HAZ_TYPE = 'WS'
 N_PROB_EVENTS = 5 * 6
 """Number of events per historic event in probabilistic dataset"""
 
-FORECAST_DIR = CONFIG.hazard.storm_europe.forecast_dir.str()
-
 
 class StormEurope(Hazard):
     """A hazard set containing european winter storm events. Historic storm
     events can be downloaded at http://wisc.climate.copernicus.eu/ and read
-    read_footprints(). Weather forecasts can be automatically downloaded from
-    https://opendata.dwd.de/ and read with read_icon_grib(). Weather forecast
+    with `from_footprints`. Weather forecasts can be automatically downloaded from
+    https://opendata.dwd.de/ and read with from_icon_grib(). Weather forecast
     from the COSMO-Consortium http://www.cosmo-model.org/ can be read with
-    read_cosmoe_file().
+    from_cosmoe_file().
 
-    Attributes:
-        ssi_wisc (np.array, float): Storm Severity Index (SSI) as recorded in
-            the footprint files; apparently not reproducible from the footprint
-            values only.
-        ssi (np.array, float): SSI as set by set_ssi; uses the Dawkins
-            definition by default.
+    Attributes
+    ----------
+    ssi_wisc : np.array, float
+        Storm Severity Index (SSI) as recorded in
+        the footprint files; apparently not reproducible from the footprint
+        values only.
+    ssi : np.array, float
+        SSI as set by set_ssi; uses the Dawkins
+        definition by default.
     """
 
     intensity_thres = 14.7
-    """Intensity threshold for storage in m/s; same as used by WISC SSI
-        calculations."""
+    """Intensity threshold for storage in m/s; same as used by WISC SSI calculations."""
 
     vars_opt = Hazard.vars_opt.union({'ssi_wisc', 'ssi', 'ssi_full_area'})
     """Name of the variables that aren't need to compute the impact."""
@@ -88,38 +89,59 @@ class StormEurope(Hazard):
         self.ssi_wisc = np.array([], float)
         self.ssi_full_area = np.array([], float)
 
-    def read_footprints(self, path, description=None,
-                        ref_raster=None, centroids=None,
-                        files_omit='fp_era20c_1990012515_701_0.nc',
-                        combine_threshold=None):
-        """Clear instance and read WISC footprints into it. Read Assumes that
-        all footprints have the same coordinates as the first file listed/first
+    def read_footprints(self, *args, **kwargs):
+        """This function is deprecated, use StormEurope.from_footprints instead."""
+        LOGGER.warning("The use of StormEurope.read_footprints is deprecated."
+                       "Use StormEurope.from_footprints instead.")
+        self.__dict__ = StormEurope.from_footprints(*args, **kwargs).__dict__
+
+    @classmethod
+    def from_footprints(cls, path, description=None, ref_raster=None, centroids=None,
+                        files_omit='fp_era20c_1990012515_701_0.nc', combine_threshold=None,
+                        intensity_thres=None):
+        """Create new StormEurope object from WISC footprints.
+
+        Assumes that all footprints have the same coordinates as the first file listed/first
         file in dir.
 
-        Parameters:
-            path (str, list(str)): A location in the filesystem. Either a
-                path to a single netCDF WISC footprint, or a folder
-                containing only footprints, or a globbing pattern to one or
-                more footprints.
-            description (str, optional): description of the events, defaults
-                to 'WISC historical hazard set'
-            ref_raster (str, optional): Reference netCDF file from which to
-                construct a new barebones Centroids instance. Defaults to
-                the first file in path.
-            centroids (Centroids, optional): A Centroids struct, overriding
-                ref_raster
-            files_omit (str, list(str), optional): List of files to omit;
-                defaults to one duplicate storm present in the WISC set as
-                of 2018-09-10.
-            combine_threshold (int, optional): threshold for combining events
-                in number of days. if the difference of the dates (self.date)
-                of two events is smaller or equal to this threshold, the two
-                events are combined into one.
-                Default is None, Advised for WISC is 2
+        Parameters
+        ----------
+        path : str, list(str)
+            A location in the filesystem. Either a
+            path to a single netCDF WISC footprint, or a folder
+            containing only footprints, or a globbing pattern to one or
+            more footprints.
+        description : str, optional
+            description of the events, defaults
+            to 'WISC historical hazard set'
+        ref_raster : str, optional
+            Reference netCDF file from which to
+            construct a new barebones Centroids instance. Defaults to
+            the first file in path.
+        centroids : Centroids, optional
+            A Centroids struct, overriding
+            ref_raster
+        files_omit : str, list(str), optional
+            List of files to omit;
+            defaults to one duplicate storm present in the WISC set as
+            of 2018-09-10.
+        combine_threshold : int, optional
+            threshold for combining events
+            in number of days. if the difference of the dates (self.date)
+            of two events is smaller or equal to this threshold, the two
+            events are combined into one.
+            Default is None, Advised for WISC is 2
+        intensity_thres : float, optional
+            Intensity threshold for storage in m/s. Default: class attribute
+            StormEurope.intensity_thres (same as used by WISC SSI calculations)
+
+        Returns
+        -------
+        haz : StormEurope
+            StormEurope object with data from WISC footprints.
         """
-
-        self.clear()
-
+        # pylint: disable=protected-access
+        intensity_thres = cls.intensity_thres if intensity_thres is None else intensity_thres
         file_names = get_file_names(path)
 
         if ref_raster is not None and centroids is not None:
@@ -128,57 +150,67 @@ class StormEurope(Hazard):
         if centroids is not None:
             pass
         elif ref_raster is not None:
-            centroids = self._centroids_from_nc(ref_raster)
+            centroids = cls._centroids_from_nc(ref_raster)
         elif ref_raster is None:
-            centroids = self._centroids_from_nc(file_names[0])
+            centroids = cls._centroids_from_nc(file_names[0])
 
         if isinstance(files_omit, str):
             files_omit = [files_omit]
 
         LOGGER.info('Commencing to iterate over netCDF files.')
 
+        haz = cls()
         for file_name in file_names:
             if any(fo in file_name for fo in files_omit):
                 LOGGER.info("Omitting file %s", file_name)
                 continue
-            new_haz = self._read_one_nc(file_name, centroids)
+            new_haz = cls._read_one_nc(file_name, centroids, intensity_thres)
             if new_haz is not None:
-                self.append(new_haz)
+                haz.append(new_haz)
 
-        self.event_id = np.arange(1, len(self.event_id) + 1)
-        self.frequency = np.divide(
-            np.ones_like(self.date),
-            (last_year(self.date) - first_year(self.date))
+        haz.event_id = np.arange(1, len(haz.event_id) + 1)
+        haz.frequency = np.divide(
+            np.ones_like(haz.date),
+            np.max([(last_year(haz.date) - first_year(haz.date)), 1])
         )
 
-        self.tag = TagHazard(
+        haz.tag = TagHazard(
             HAZ_TYPE, 'Hazard set not saved by default',
             description='WISC historical hazard set.'
         )
         if description is not None:
-            self.tag.description = description
+            haz.tag.description = description
 
         if combine_threshold is not None:
             LOGGER.info('Combining events with small difference in date.')
-            difference_date = np.diff(self.date)
-            for event_id_i in self.event_id[
+            difference_date = np.diff(haz.date)
+            for event_id_i in haz.event_id[
                     np.append(difference_date <= combine_threshold, False)]:
                 event_ids = [event_id_i, event_id_i + 1]
-                self._combine_events(event_ids)
+                haz._combine_events(event_ids)
+        return haz
 
-    def _read_one_nc(self, file_name, centroids):
+    @staticmethod
+    def _read_one_nc(file_name, centroids, intensity_thres):
         """Read a single WISC footprint. Assumes a time dimension of length 1.
         Omits a footprint if another file with the same timestamp has already
         been read.
 
-        Parameters:
-            file_name (str): Absolute or relative path to *.nc
-            centroids (Centroids): Centr. instance that matches the
-                coordinates used in the *.nc, only validated by size.
+        Parameters
+        ----------
+        file_name : str
+            Absolute or relative path to *.nc
+        centroids : Centroids
+            Centr. instance that matches the
+            coordinates used in the *.nc, only validated by size.
+        intensity_thres : float
+            Intensity threshold for storage in m/s.
 
-        Returns:
-            new_haz (StormEurope): Hazard instance for one single storm.
-       """
+        Returns
+        -------
+        new_haz : StormEurope
+            Hazard instance for one single storm.
+        """
         ncdf = xr.open_dataset(file_name)
 
         if centroids.size != (ncdf.sizes['latitude'] * ncdf.sizes['longitude']):
@@ -192,7 +224,7 @@ class StormEurope(Hazard):
         stacked = ncdf.max_wind_gust.stack(
             intensity=('latitude', 'longitude', 'time')
         )
-        stacked = stacked.where(stacked > self.intensity_thres)
+        stacked = stacked.where(stacked > intensity_thres)
         stacked = stacked.fillna(0)
 
         # fill in values from netCDF
@@ -206,94 +238,112 @@ class StormEurope(Hazard):
         new_haz.centroids = centroids
         new_haz.event_id = np.array([1])
         new_haz.frequency = np.array([1])
-        new_haz.fraction = new_haz.intensity.copy().tocsr()
-        new_haz.fraction.data.fill(1)
+        new_haz.fraction = sparse.csr_matrix(new_haz.intensity.shape)
         new_haz.orig = np.array([True])
 
         ncdf.close()
         return new_haz
 
+    def read_cosmoe_file(self, *args, **kwargs):
+        """This function is deprecated, use StormEurope.from_cosmoe_file instead."""
+        LOGGER.warning("The use of StormEurope.read_cosmoe_file is deprecated."
+                       "Use StormEurope.from_cosmoe_file instead.")
+        self.__dict__ = StormEurope.from_cosmoe_file(*args, **kwargs).__dict__
 
-    def read_cosmoe_file(self, fp_file, run_datetime, event_date=None,
-                         model_name='COSMO-2E', description=None):
-        """Clear instance and read gust footprint from weather forecast
-        into it. The funciton is designed for the COSMO ensemble model used by
+    @classmethod
+    def from_cosmoe_file(cls, fp_file, run_datetime, event_date=None,
+                         model_name='COSMO-2E', description=None, intensity_thres=None):
+        """Create a new StormEurope object with gust footprint from weather forecast.
+
+        The funciton is designed for the COSMO ensemble model used by
         the COSMO Consortium http://www.cosmo-model.org/ and postprocessed to
         an netcdf file using fieldextra. One event is one full day in UTC.
         Works for MeteoSwiss model output of
         COSMO-1E (11 members, resolution 1.1 km, forecast period 33-45 hours)
         COSMO-2E (21 members, resolution 2.2 km, forecast period 5 days)
 
-        Parameters:
-            fp_file (str): string directing to one netcdf file
-            run_datetime (datetime): The starting timepoint of the forecast run
-                of the cosmo model
-            event_date (datetime, optional): one day within the forecast
-                period, only this day (00H-24H) will be included in the hazard
-            model_name (str,optional): provide the name of the COSMO model,
-                for the description (e.g., 'COSMO-1E', 'COSMO-2E')
-            description (str, optional): description of the events, defaults
-                to a combination of model_name and run_datetime
+        The frequency of each event is informed by their probability in the ensemble
+        forecast and is equal to 1/11 or 1/21 for COSMO-1E or COSMO-2E, respectively.
+
+        Parameters
+        ----------
+        fp_file : str
+            string directing to one netcdf file
+        run_datetime : datetime
+            The starting timepoint of the forecast run
+            of the cosmo model
+        event_date : datetime, optional
+            one day within the forecast
+            period, only this day (00H-24H) will be included in the hazard
+        model_name : str,optional
+            provide the name of the COSMO model,
+            for the description (e.g., 'COSMO-1E', 'COSMO-2E')
+        description : str, optional
+            description of the events, defaults
+            to a combination of model_name and run_datetime
+        intensity_thres : float, optional
+            Intensity threshold for storage in m/s. Default: class attribute
+            StormEurope.intensity_thres (same as used by WISC SSI calculations)
+
+        Returns
+        -------
+        haz : StormEurope
+            StormEurope object with data from COSMO ensemble file.
         """
-        self.clear()
+        intensity_thres = cls.intensity_thres if intensity_thres is None else intensity_thres
+
+        haz = cls()
         # create centroids
-        self.centroids = self._centroids_from_nc(fp_file)
+        haz.centroids = cls._centroids_from_nc(fp_file)
 
         # read intensity from file
         ncdf = xr.open_dataset(fp_file)
-        ncdf = ncdf.assign_coords(date=('time',ncdf["time"].dt.floor("D")))
+        ncdf = ncdf.assign_coords(date=('time',ncdf["time"].dt.floor("D").values))
 
         if event_date:
             try:
-                stacked = ncdf.sel(time=event_date.strftime('%Y-%m-%d')
-                                    ).groupby('date'
-                                              ).max().stack(intensity=('y_1',
-                                                                       'x_1'))
-            except KeyError:
-                raise ValueError('Extraction of date and coordinates failed. '
-                                 'This is most likely because '
-                                 'the selected event_date {} is not contained'
-                                 ' in the weather forecast selected by '
-                                 'fp_file {}. Please adjust event_date'
-                                 ' or fp_file.'.format(
-                                     event_date.strftime('%Y-%m-%d'),
-                                     fp_file))
+                stacked = ncdf.sel(
+                    time=event_date.strftime('%Y-%m-%d')
+                    ).groupby('date').max().stack(intensity=('y_1', 'x_1'))
+            except KeyError as ker:
+                raise ValueError('Extraction of date and coordinates failed. This is most likely '
+                                 'because the selected event_date '
+                                 f'{event_date.strftime("%Y-%m-%d")} is not contained in the '
+                                 'weather forecast selected by fp_file {fp_file}. Please adjust '
+                                 f'event_date or fp_file.') from ker
             considered_dates = np.datetime64(event_date)
         else:
             time_covered_step = ncdf['time'].diff('time')
             time_covered_day = time_covered_step.groupby('date').sum()
             # forecast run should cover at least 18 hours of a day
             considered_dates_bool = time_covered_day >= np.timedelta64(18,'h')
-            stacked = ncdf.groupby('date'
-                                    ).max().sel(date=considered_dates_bool
-                                                ).stack(intensity=('y_1',
-                                                                   'x_1'))
+            stacked = ncdf.groupby('date').max()\
+                          .sel(date=considered_dates_bool)\
+                          .stack(intensity=('y_1', 'x_1'))
             considered_dates = stacked['date'].values
         stacked = stacked.stack(date_ensemble=('date', 'epsd_1'))
-        stacked = stacked.where(stacked.VMAX_10M > self.intensity_thres)
+        stacked = stacked.where(stacked.VMAX_10M > intensity_thres)
         stacked = stacked.fillna(0)
 
         # fill in values from netCDF
-        self.intensity = sparse.csr_matrix(stacked.VMAX_10M.T)
-        self.event_id = np.arange(stacked.date_ensemble.size)+1
-
+        haz.intensity = sparse.csr_matrix(stacked.VMAX_10M.T)
+        haz.event_id = np.arange(stacked.date_ensemble.size) + 1
 
         # fill in default values
-        self.units = 'm/s'
-        self.fraction = self.intensity.copy().tocsr()
-        self.fraction.data.fill(1)
-        self.orig = np.ones_like(self.event_id)*False
-        self.orig[(stacked.epsd_1 == 0).values] = True
-        self.date = np.repeat(
+        haz.units = 'm/s'
+        haz.fraction = haz.intensity.copy().tocsr()
+        haz.fraction.data.fill(1)
+        haz.orig = np.ones_like(haz.event_id)*False
+        haz.orig[(stacked.epsd_1 == 0).values] = True
+        haz.date = np.repeat(
             np.array(datetime64_to_ordinal(considered_dates)),
             np.unique(ncdf.epsd_1).size
-            )
-        self.event_name = [date_i + '_ens' + str(ens_i)
-                           for date_i, ens_i in zip(date_to_str(self.date),
-                                                    stacked.epsd_1.values+1)
-                           ]
-        self.frequency = np.divide(
-                np.ones_like(self.event_id),
+        )
+        haz.event_name = [date_i + '_ens' + str(ens_i)
+                          for date_i, ens_i
+                          in zip(date_to_str(haz.date), stacked.epsd_1.values+1)]
+        haz.frequency = np.divide(
+                np.ones_like(haz.event_id),
                 np.unique(ncdf.epsd_1).size)
         if not description:
             description = (model_name +
@@ -301,19 +351,28 @@ class StormEurope(Hazard):
                            'for run startet at ' +
                            run_datetime.strftime('%Y%m%d%H'))
 
-        self.tag = TagHazard(
-                HAZ_TYPE, 'Hazard set not saved, too large to pickle',
-                description=description
-            )
+        haz.tag = TagHazard(
+            HAZ_TYPE, 'Hazard set not saved, too large to pickle',
+            description=description
+        )
         # close netcdf file
         ncdf.close()
-        self.check()
+        haz.check()
+        return haz
 
-    def read_icon_grib(self, run_datetime, event_date=None,
-                       model_name='icon-eu-eps', description=None,
-                       grib_dir=None, delete_raw_data=True):
-        """Clear instance and download and read dwd icon weather forecast
-        footprints into it. New files are available for 24 hours on
+    def read_icon_grib(self, *args, **kwargs):
+        """This function is deprecated, use StormEurope.from_icon_grib instead."""
+        LOGGER.warning("The use of StormEurope.read_icon_grib is deprecated."
+                       "Use StormEurope.from_icon_grib instead.")
+        self.__dict__ = StormEurope.from_icon_grib(*args, **kwargs).__dict__
+
+    @classmethod
+    def from_icon_grib(cls, run_datetime, event_date=None, model_name='icon-eu-eps',
+                       description=None, grib_dir=None, delete_raw_data=True,
+                       intensity_thres=None):
+        """Create new StormEurope object from DWD icon weather forecast footprints.
+
+        New files are available for 24 hours on
         https://opendata.dwd.de, old files can be processed if they are
         already stored in grib_dir.
         One event is one full day in UTC. Current setup works for runs
@@ -321,34 +380,53 @@ class StormEurope(Hazard):
         because of the given file structure with 1-hour, 3-hour and
         6-hour maxima provided.
 
-        Parameters:
-            run_datetime (datetime): The starting timepoint of the forecast run
-                of the icon model
-            event_date (datetime, optional): one day within the forecast
-                period, only this day (00H-24H) will be included in the hazard
-            model_name (str,optional): select the name of the icon model to
-                be downloaded. Must match the url on https://opendata.dwd.de
-                (see download_icon_grib for further info)
-            description (str, optional): description of the events, defaults
-                to a combination of model_name and run_datetime
-            grib_dir (str, optional): path to folder, where grib files are
-                or should be stored
-            delete_raw_data (bool,optional): select if downloaded raw data in
-                .grib.bz2 file format should be stored on the computer or
-                removed
+        The frequency for one event is 1/(number of ensemble members)
+
+        Parameters
+        ----------
+        run_datetime : datetime
+            The starting timepoint of the forecast run
+            of the icon model
+        event_date : datetime, optional
+            one day within the forecast
+            period, only this day (00H-24H) will be included in the hazard
+        model_name : str,optional
+            select the name of the icon model to
+            be downloaded. Must match the url on https://opendata.dwd.de
+            (see download_icon_grib for further info)
+        description : str, optional
+            description of the events, defaults
+            to a combination of model_name and run_datetime
+        grib_dir : str, optional
+            path to folder, where grib files are
+            or should be stored
+        delete_raw_data : bool,optional
+            select if downloaded raw data in
+            .grib.bz2 file format should be stored on the computer or
+            removed
+        intensity_thres : float, optional
+            Intensity threshold for storage in m/s. Default: class attribute
+            StormEurope.intensity_thres (same as used by WISC SSI calculations)
+
+        Returns
+        -------
+        haz : StormEurope
+            StormEurope object with data from DWD icon weather forecast footprints.
         """
-        self.clear()
+        # pylint: disable=protected-access
+        intensity_thres = cls.intensity_thres if intensity_thres is None else intensity_thres
+
+        haz = cls()
         if not (run_datetime.hour == 0 or run_datetime.hour == 12):
-            LOGGER.warning('The event definition is inaccuratly implemented '+
+            LOGGER.warning('The event definition is inaccuratly implemented '
                            'for starting times, which are not 00H or 12H.')
         # download files, if they don't already exist
-        file_names = download_icon_grib(run_datetime,
-                                        model_name=model_name,
-                                        download_dir=grib_dir)
+        file_names = download_icon_grib(
+            run_datetime, model_name=model_name, download_dir=grib_dir)
 
         # create centroids
         nc_centroids_file = download_icon_centroids_file(model_name, grib_dir)
-        self.centroids = self._centroids_from_nc(nc_centroids_file)
+        haz.centroids = haz._centroids_from_nc(nc_centroids_file)
 
         # read intensity from files
         for ind_i, file_i in enumerate(file_names):
@@ -362,19 +440,19 @@ class StormEurope(Hazard):
                 stacked = xr.concat([stacked,ds_i], 'valid_time')
 
         # create intensity matrix with max for each full day
-        stacked = stacked.assign_coords(date=('valid_time',stacked["valid_time"].dt.floor("D")))
+        stacked = stacked.assign_coords(
+            date=('valid_time', stacked["valid_time"].dt.floor("D").values))
         if event_date:
             try:
-                stacked = stacked.sel(valid_time=event_date.strftime('%Y-%m-%d')).groupby('date').max()
-            except KeyError:
-                raise ValueError('Extraction of date and coordinates failed. '
-                                 'This is most likely because '
-                                 'the selected event_date {} is not contained'
-                                 ' in the weather forecast selected by '
-                                 'run_datetime {}. Please adjust event_date'
-                                 ' or run_datetime.'.format(
-                                     event_date.strftime('%Y-%m-%d'),
-                                     run_datetime.strftime('%Y-%m-%d %H:%M')))
+                stacked = stacked.sel(
+                    valid_time=event_date.strftime('%Y-%m-%d')).groupby('date').max()
+            except KeyError as ker:
+                raise ValueError('Extraction of date and coordinates failed. This is most likely '
+                                 'because the selected event_date '
+                                 f'{event_date.strftime("%Y-%m-%d")} is not contained in the '
+                                 'weather forecast selected by run_datetime'
+                                 f'{run_datetime.strftime("%Y-%m-%d %H:%M")}. Please adjust '
+                                 'event_date or run_datetime.') from ker
 
             considered_dates = np.datetime64(event_date)
         else:
@@ -385,44 +463,40 @@ class StormEurope(Hazard):
             stacked = stacked.groupby('date').max().sel(date=considered_dates_bool)
             considered_dates = stacked['date'].values
         stacked = stacked.stack(date_ensemble=('date', 'number'))
-        stacked = stacked.where(stacked > self.intensity_thres)
+        stacked = stacked.where(stacked > intensity_thres)
         stacked = stacked.fillna(0)
 
 
         # fill in values from netCDF
-        self.intensity = sparse.csr_matrix(stacked.gust.T)
-        self.event_id = np.arange(stacked.date_ensemble.size)+1
+        haz.intensity = sparse.csr_matrix(stacked.gust.T)
+        haz.event_id = np.arange(stacked.date_ensemble.size)+1
 
         # fill in default values
-        self.units = 'm/s'
-        self.fraction = self.intensity.copy().tocsr()
-        self.fraction.data.fill(1)
-        self.orig = np.ones_like(self.event_id)*False
-        self.orig[(stacked.number == 1).values] = True
+        haz.units = 'm/s'
+        haz.fraction = haz.intensity.copy().tocsr()
+        haz.fraction.data.fill(1)
+        haz.orig = np.ones_like(haz.event_id)*False
+        haz.orig[(stacked.number == 1).values] = True
 
-        self.date = np.repeat(
+        haz.date = np.repeat(
             np.array(datetime64_to_ordinal(considered_dates)),
             np.unique(stacked.number).size
             )
-        self.event_name = [date_i + '_ens' + str(ens_i)
-                           for date_i, ens_i in zip(date_to_str(self.date),
-                                                    stacked.number.values)
-                           ]
-        self.frequency = np.divide(
-                np.ones_like(self.event_id),
+        haz.event_name = [date_i + '_ens' + str(ens_i)
+                          for date_i, ens_i in zip(date_to_str(haz.date), stacked.number.values)]
+        haz.frequency = np.divide(
+                np.ones_like(haz.event_id),
                 np.unique(stacked.number).size)
         if not description:
             description = ('icon weather forecast windfield ' +
                            'for run startet at ' +
                            run_datetime.strftime('%Y%m%d%H'))
 
-        self.tag = TagHazard(
+        haz.tag = TagHazard(
             HAZ_TYPE, 'Hazard set not saved, too large to pickle',
             description=description
             )
-        self.check()
-
-
+        haz.check()
 
         # delete generated .grib2 and .4cc40.idx files
         for ind_i, file_i in enumerate(file_names):
@@ -434,9 +508,9 @@ class StormEurope(Hazard):
 
         if delete_raw_data:
             #delete downloaded .bz2 files
-            delete_icon_grib(run_datetime,
-                             model_name=model_name,
-                             download_dir=grib_dir)
+            delete_icon_grib(run_datetime, model_name=model_name, download_dir=grib_dir)
+
+        return haz
 
     @staticmethod
     def _centroids_from_nc(file_name):
@@ -444,7 +518,6 @@ class StormEurope(Hazard):
         'longitude' variables in a netCDF file.
         """
         LOGGER.info('Constructing centroids from %s', file_name)
-        cent = Centroids()
         ncdf = xr.open_dataset(file_name)
         create_meshgrid = True
         if hasattr(ncdf, 'latitude'):
@@ -478,8 +551,7 @@ class StormEurope(Hazard):
         if create_meshgrid:
             lats, lons = np.array([np.repeat(lats, len(lons)),
                                    np.tile(lons, len(lats))])
-        cent = Centroids()
-        cent.set_lat_lon(lats, lons)
+        cent = Centroids.from_lat_lon(lats, lons)
         cent.set_area_pixel()
         cent.set_on_land()
 
@@ -491,8 +563,10 @@ class StormEurope(Hazard):
 
         the event_ids must be consecutive for the event_name field to behave correctly
 
-        Parameters:
-            event_ids (array): two consecutive event ids
+        Parameters
+        ----------
+        event_ids : array
+            two consecutive event ids
         """
         select_event_ids = np.isin(self.event_id, event_ids)
         select_other_events = np.invert(select_event_ids)
@@ -544,20 +618,28 @@ class StormEurope(Hazard):
         also be due to differing definitions of what lies on land (i.e. Syria,
         Russia, Northern Africa and Greenland are exempt).
 
-        Parameters:
-            method (str): Either 'dawkins' or 'wisc_gust'
-            intensity (scipy.sparse.csr): Intensity matrix; defaults to
-                self.intensity
-            on_land (bool): Only calculate the SSI for areas on land,
-                ignoring the intensities at sea. Defaults to true, whereas
-                the MATLAB version did not.
-            threshold (float, optional): Intensity threshold used in index
-                definition. Cannot be lower than the read-in value.
-            sel_cen (np.array, bool): A boolean vector selecting centroids.
-                Takes precendence over on_land.
+        Parameters
+        ----------
+        method : str
+            Either 'dawkins' or 'wisc_gust'
+        intensity : scipy.sparse.csr
+            Intensity matrix; defaults to
+            self.intensity
+        on_land : bool
+            Only calculate the SSI for areas on land,
+            ignoring the intensities at sea. Defaults to true, whereas
+            the MATLAB version did not.
+        threshold : float, optional
+            Intensity threshold used in index
+            definition. Cannot be lower than the read-in value.
+        sel_cen : np.array, bool
+            A boolean vector selecting centroids.
+            Takes precendence over on_land.
 
-        Attributes:
-            self.ssi_dawkins (np.array): SSI per event
+        Attributes
+        ----------
+        self.ssi_dawkins : np.array
+            SSI per event
         """
         if intensity is not None:
             if not isinstance(intensity, sparse.csr_matrix):
@@ -603,11 +685,15 @@ class StormEurope(Hazard):
     def set_ssi(self, **kwargs):
         """Wrapper around calc_ssi for setting the self.ssi attribute.
 
-        Parameters:
-            **kwargs: passed on to calc_ssi
+        Parameters
+        ----------
+        kwargs :
+            passed on to calc_ssi
 
-        Attributes:
-            ssi (np.array): SSI per event
+        Attributes
+        ----------
+        ssi : np.array
+            SSI per event
         """
         self.ssi = self.calc_ssi(**kwargs)
 
@@ -615,9 +701,10 @@ class StormEurope(Hazard):
         """Plot the distribution of SSIs versus their cumulative exceedance
             frequencies, highlighting historical storms in red.
 
-        Returns:
-            fig (matplotlib.figure.Figure)
-            ax (matplotlib.axes._subplots.AxesSubplot)
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+        ax : matplotlib.axes._subplots.AxesSubplot
         """
         if full_area:
             ssi = self.ssi_full_area
@@ -669,18 +756,25 @@ class StormEurope(Hazard):
             - Can only use numeric region_id for country selection
             - Drops event names as provided by WISC
 
-        Parameters:
-            region_id (int, list of ints, or None): iso_n3 code of the
-                countries we want the generated hazard set to be returned for.
-            spatial_shift (int): amount of raster pixels to shift by
-            ssi_args (dict): A dictionary of arguments passed to calc_ssi
-            **kwargs: keyword arguments passed on to self._hist2prob()
+        Parameters
+        ----------
+        region_id : int, list of ints, or None
+            iso_n3 code of the
+            countries we want the generated hazard set to be returned for.
+        spatial_shift : int
+            amount of raster pixels to shift by
+        ssi_args : dict
+            A dictionary of arguments passed to calc_ssi
+        kwargs :
+            keyword arguments passed on to self._hist2prob()
 
-        Returns:
-            new_haz (StormEurope): A new hazard set for the given country.
-                Centroid attributes are preserved. self.orig attribute is set
-                to True for original storms (event_id ending in 00). Also
-                contains a ssi_prob attribute,
+        Returns
+        -------
+        new_haz : StormEurope
+            A new hazard set for the given country.
+            Centroid attributes are preserved. self.orig attribute is set
+            to True for original storms (event_id ending in 00). Also
+            contains a ssi_prob attribute,
         """
         # bool vector selecting the targeted centroids
         if reg_id is not None:
@@ -836,22 +930,16 @@ class StormEurope(Hazard):
         return intensity_out[:, sel_cen], ssi
 
 
-def generate_WS_forecast_hazard(run_datetime = dt.datetime.today().replace(hour=0, 
-                                                                           minute=0, 
-                                                                           second=0, 
-                                                                           microsecond=0),
-                                event_date = (dt.datetime.today().replace(hour=0, 
-                                                                          minute=0, 
-                                                                          second=0,
-                                                                          microsecond=0)
-                                              + dt.timedelta(days=2)),
-                                haz_model = 'icon-eu-eps',
-                                haz_raw_storage = None,
-                                save_haz = True):
-    """ use the initialization time (run_datetime), the date of the event and
+# pylint: disable=invalid-name
+def generate_WS_forecast_hazard(run_datetime=None,
+                                event_date=None,
+                                haz_model='icon-eu-eps',
+                                haz_raw_storage=None,
+                                save_haz=True):
+    """use the initialization time (run_datetime), the date of the event and
     specify the forecast model (haz_model) to generate a Hazard from forecast
     data either by download or through reading from existing file.
-    
+
     Parameters
     ----------
     run_datetime: datetime.datetime, optional
@@ -863,7 +951,8 @@ def generate_WS_forecast_hazard(run_datetime = dt.datetime.today().replace(hour=
         defaults to the day after tomorrow
     haz_model: str, optional
         select the name of the model to
-        be used: one of ['icon-eu-eps', 'cosmo1e_file', 'cosmo2e_file'],
+        be used: one of ['icon-eu-eps', 'icon-d2-eps', 'cosmo1e_file',
+                         'cosmo2e_file'],
         default is 'icon-eu-eps'.
     haz_raw_storage: str, optional
         path to folder, where netcdf files
@@ -874,8 +963,9 @@ def generate_WS_forecast_hazard(run_datetime = dt.datetime.today().replace(hour=
         Default None resolves to "cosmoe_forecast_{}_vmax.nc" in
         CONFIG.hazard.storm_europe.forecast_dir
     save_haz: bool, optional
-        flag if resulting hazard should be saved in 
+        flag if resulting hazard should be saved in
         CONFIG.hazard.storm_europe.forecast_dir, default is True.
+
     Returns
     -------
     Hazard
@@ -887,79 +977,63 @@ def generate_WS_forecast_hazard(run_datetime = dt.datetime.today().replace(hour=
     datetime.datetime
         event_date
     """
-    if (haz_model == 'cosmo1e_file'
-        or
-        haz_model == 'cosmo2e_file'):
+    FORECAST_DIR = CONFIG.hazard.storm_europe.forecast_dir.dir()
+
+    if run_datetime is None:
+        run_datetime = dt.datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
+    if event_date is None:
+        event_date = dt.datetime.today().replace(hour=0, minute=0, second=0, microsecond=0) \
+                   + dt.timedelta(days=2)
+
+    if haz_model in ['cosmo1e_file', 'cosmo2e_file']:
         if haz_model == 'cosmo1e_file':
             haz_model='C1E'
             full_model_name_temp = 'COSMO-1E'
         if haz_model == 'cosmo2e_file':
             haz_model='C2E'
             full_model_name_temp = 'COSMO-2E'
-        haz_file_name = Path(FORECAST_DIR) / (HAZ_TYPE +
-                                              '_' +
-                                              haz_model +
-                                              '_run' +
-                                              run_datetime.strftime('%Y%m%d%H') +
-                                              '_event' +
-                                              event_date.strftime('%Y%m%d')
-                                              +
-                                              '.hdf5')   
-        if haz_file_name.exists():
-            LOGGER.info('Loading hazard from ' + 
-                        str(haz_file_name) + 
-                        '.')
-            hazard = StormEurope()
-            hazard.read_hdf5(haz_file_name)
+        haz_file_name = (f'{HAZ_TYPE}_{haz_model}_run{run_datetime.strftime("%Y%m%d%H")}'
+                         f'_event{event_date.strftime("%Y%m%d")}.hdf5')
+        haz_file = FORECAST_DIR / haz_file_name
+        if haz_file.exists():
+            LOGGER.info('Loading hazard from %s.', haz_file)
+            hazard = StormEurope.from_hdf5(haz_file)
         else:
-            LOGGER.info('Generating ' + 
-                        haz_model + 
-                        ' hazard.')  
+            LOGGER.info('Generating %s hazard.', haz_model)
             if not haz_raw_storage:
-                haz_raw_storage = Path(FORECAST_DIR) / "cosmoe_forecast_{}_vmax.nc"
-            fp_file = Path(
-                str(haz_raw_storage).format(
-                    run_datetime.strftime('%y%m%d%H')
-                    )
-                )
-            hazard = StormEurope()
-            hazard.read_cosmoe_file(
-                fp_file, 
+                haz_raw_storage = FORECAST_DIR / "cosmoe_forecast_{}_vmax.nc"
+            fp_file = Path(str(haz_raw_storage).format(run_datetime.strftime('%y%m%d%H')))
+            hazard = StormEurope.from_cosmoe_file(
+                fp_file,
                 event_date=event_date,
                 run_datetime=run_datetime,
                 model_name=full_model_name_temp
-                )
+            )
             if save_haz:
-                hazard.write_hdf5(haz_file_name)
-    elif haz_model == 'icon-eu-eps':
-        haz_model='IEE'
-        haz_file_name = Path(FORECAST_DIR) / (HAZ_TYPE +
-                                              '_' +
-                                              haz_model +
-                                              '_run' +
-                                              run_datetime.strftime('%Y%m%d%H') +
-                                              '_event' +
-                                              event_date.strftime('%Y%m%d')
-                                              +
-                                              '.hdf5')   
-        if haz_file_name.exists():
-            LOGGER.info('Loading hazard from ' + 
-                        str(haz_file_name) + 
-                        '.')
-            hazard = StormEurope()
-            hazard.read_hdf5(haz_file_name)
+                hazard.write_hdf5(haz_file)
+    elif haz_model in ['icon-eu-eps', 'icon-d2-eps']:
+        if haz_model == 'icon-eu-eps':
+            full_model_name_temp = haz_model
+            haz_model='IEE'
+        if haz_model == 'icon-d2-eps':
+            full_model_name_temp = haz_model
+            haz_model='IDE'
+        haz_file_name = (f'{HAZ_TYPE}_{haz_model}_run{run_datetime.strftime("%Y%m%d%H")}'
+                         f'_event{event_date.strftime("%Y%m%d")}.hdf5')
+        haz_file = FORECAST_DIR / haz_file_name
+        if haz_file.exists():
+            LOGGER.info('Loading hazard from %s.', haz_file)
+            hazard = StormEurope.from_hdf5(haz_file)
         else:
-            LOGGER.info('Generating ' + 
-                        haz_model + 
-                        ' hazard.')                    
-            hazard = StormEurope()
-            hazard.read_icon_grib(
+            LOGGER.info('Generating %s hazard.', haz_model)
+            hazard = StormEurope.from_icon_grib(
                 run_datetime,
                 event_date=event_date,
-                delete_raw_data=False
-                )
+                delete_raw_data=False,
+                model_name=full_model_name_temp
+            )
             if save_haz:
-                hazard.write_hdf5(haz_file_name)
+                hazard.write_hdf5(haz_file)
     else:
         raise NotImplementedError("specific 'WS' hazard not implemented yet. " +
                                   "Please specify a valid value for haz_model.")

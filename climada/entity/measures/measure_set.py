@@ -21,9 +21,11 @@ Define MeasureSet class.
 
 __all__ = ['MeasureSet']
 
+import ast
 import copy
 import logging
-import ast
+from typing import Optional, List
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -85,49 +87,80 @@ class MeasureSet():
     """Contains measures of type Measure. Loads from
     files with format defined in FILE_EXT.
 
-    Attributes:
-        tag (Tag): information about the source data
-        _data (dict): cotains Measure classes. It's not suppossed to be
-            directly accessed. Use the class methods instead.
+    Attributes
+    ----------
+    tag : Tag
+        information about the source data
+    _data : dict
+        Contains Measure objects. This attribute is not suppossed to be accessed directly.
+        Use the available methods instead.
     """
 
-    def __init__(self):
-        """Empty initialization.
+    def __init__(
+        self,
+        measure_list: Optional[List[Measure]] = None,
+        tag: Optional[Tag] = None,
+    ):
+        """Initialize a new MeasureSet object with specified data.
 
-        Examples:
-            Fill MeasureSet with values and check consistency data:
+        Parameters
+        ----------
+        measure_list : list of Measure objects, optional
+            The measures to include in the MeasureSet
+        tag : Tag, optional
+            Information about the source data
 
-            >>> act_1 = Measure()
-            >>> act_1.name = 'Seawall'
-            >>> act_1.color_rgb = np.array([0.1529, 0.2510, 0.5451])
-            >>> act_1.hazard_intensity = (1, 0)
-            >>> act_1.mdd_impact = (1, 0)
-            >>> act_1.paa_impact = (1, 0)
-            >>> meas = MeasureSet()
-            >>> meas.append(act_1)
-            >>> meas.tag.description = "my dummy MeasureSet."
-            >>> meas.check()
+        Examples
+        --------
+        Fill MeasureSet with values and check consistency data:
 
-            Read measures from file and checks consistency data:
+        >>> act_1 = Measure(
+        ...     name='Seawall',
+        ...     color_rgb=np.array([0.1529, 0.2510, 0.5451]),
+        ...     hazard_intensity=(1, 0),
+        ...     mdd_impact=(1, 0),
+        ...     paa_impact=(1, 0),
+        ... )
+        >>> meas = MeasureSet(
+        ...     measure_list=[act_1],
+        ...     tag=Tag(description="my dummy MeasureSet.")
+        ... )
+        >>> meas.check()
 
-            >>> meas = MeasureSet()
-            >>> meas.read_excel(ENT_TEMPLATE_XLS)
+        Read measures from file and checks consistency data:
+
+        >>> meas = MeasureSet.from_excel(ENT_TEMPLATE_XLS)
         """
-        self.clear()
+        self.clear(tag=tag)
+        if measure_list is not None:
+            for meas in measure_list:
+                self.append(meas)
 
-    def clear(self):
-        """Reinitialize attributes."""
-        self.tag = Tag()
-        self._data = dict()  # {hazard_type : {name: Measure()}}
+    def clear(self, tag: Optional[Tag] = None, _data: Optional[dict] = None):
+        """Reinitialize attributes.
+
+        Parameters
+        ----------
+        tag : Tag, optional
+            Information about the source data. If not given, an empty Tag object is used.
+        _data : dict, optional
+            A dict containing the Measure objects. For internal use only: It's not suppossed to be
+            set directly. Use the class methods instead.
+        """
+        self.tag = tag if tag is not None else Tag()
+        self._data = _data if _data is not None else dict()  # {hazard_type : {name: Measure()}}
 
     def append(self, meas):
         """Append an Measure. Override if same name and haz_type.
 
-        Parameters:
-            meas (Measure): Measure instance
+        Parameters
+        ----------
+        meas : Measure
+            Measure instance
 
-        Raises:
-            ValueError
+        Raises
+        ------
+        ValueError
         """
         if not isinstance(meas, Measure):
             raise ValueError("Input value is not of type Measure.")
@@ -143,9 +176,12 @@ class MeasureSet():
         """Remove impact function(s) with provided hazard type and/or id.
         If no input provided, all impact functions are removed.
 
-        Parameters:
-            haz_type (str, optional): all impact functions with this hazard
-            name (str, optional): measure name
+        Parameters
+        ----------
+        haz_type : str, optional
+            all impact functions with this hazard
+        name : str, optional
+            measure name
         """
         if (haz_type is not None) and (name is not None):
             try:
@@ -171,14 +207,18 @@ class MeasureSet():
         """Get ImpactFunc(s) of input hazard type and/or id.
         If no input provided, all impact functions are returned.
 
-        Parameters:
-            haz_type (str, optional): hazard type
-            name (str, optional): measure name
+        Parameters
+        ----------
+        haz_type : str, optional
+            hazard type
+        name : str, optional
+            measure name
 
-        Returns:
-            Measure (if haz_type and name),
-            list(Measure) (if haz_type or name),
-            {Measure.haz_type: {Measure.name : Measure}} (if None)
+        Returns
+        -------
+        Measure (if haz_type and name),
+        list(Measure) (if haz_type or name),
+        {Measure.haz_type : {Measure.name : Measure}} (if None)
         """
         if (haz_type is not None) and (name is not None):
             try:
@@ -208,11 +248,14 @@ class MeasureSet():
         """Get measures hazard types contained for the name provided.
         Return all hazard types if no input name.
 
-        Parameters:
-            name (str, optional): measure name
+        Parameters
+        ----------
+        name : str, optional
+            measure name
 
-        Returns:
-            list(str)
+        Returns
+        -------
+        list(str)
         """
         if meas is None:
             return list(self._data.keys())
@@ -227,12 +270,15 @@ class MeasureSet():
         """Get measures names contained for the hazard type provided.
         Return all names for each hazard type if no input hazard type.
 
-        Parameters:
-            haz_type (str, optional): hazard type from which to obtain the names
+        Parameters
+        ----------
+        haz_type : str, optional
+            hazard type from which to obtain the names
 
-        Returns:
-            list(Measure.name) (if haz_type provided),
-            {Measure.haz_type : list(Measure.name)} (if no haz_type)
+        Returns
+        -------
+        list(Measure.name) (if haz_type provided),
+        {Measure.haz_type : list(Measure.name)} (if no haz_type)
         """
         if haz_type is None:
             out_dict = dict()
@@ -250,12 +296,16 @@ class MeasureSet():
         """Get number of measures contained with input hazard type and
         /or id. If no input provided, get total number of impact functions.
 
-        Parameters:
-            haz_type (str, optional): hazard type
-            name (str, optional): measure name
+        Parameters
+        ----------
+        haz_type : str, optional
+            hazard type
+        name : str, optional
+            measure name
 
-        Returns:
-            int
+        Returns
+        -------
+        int
         """
         if (haz_type is not None) and (name is not None) and \
         (isinstance(self.get_measure(haz_type, name), Measure)):
@@ -267,8 +317,9 @@ class MeasureSet():
     def check(self):
         """Check instance attributes.
 
-        Raises:
-            ValueError
+        Raises
+        ------
+        ValueError
         """
         for key_haz, meas_dict in self._data.items():
             def_color = plt.cm.get_cmap('Greys', len(meas_dict))
@@ -288,11 +339,14 @@ class MeasureSet():
         """Extend measures of input MeasureSet to current
         MeasureSet. Overwrite Measure if same name and haz_type.
 
-        Parameters:
-            impact_funcs (MeasureSet): ImpactFuncSet instance to extend
+        Parameters
+        ----------
+        impact_funcs : MeasureSet
+            ImpactFuncSet instance to extend
 
-        Raises:
-            ValueError
+        Raises
+        ------
+        ValueError
         """
         meas_set.check()
         if self.size() == 0:
@@ -306,62 +360,75 @@ class MeasureSet():
             for _, meas in meas_dict.items():
                 self.append(meas)
 
-    def read_mat(self, file_name, description='', var_names=DEF_VAR_MAT):
+    @classmethod
+    def from_mat(cls, file_name, description='', var_names=None):
         """Read MATLAB file generated with previous MATLAB CLIMADA version.
 
-        Parameters:
-            file_name (str): absolute file name
-            description (str, optional): description of the data
-            var_names (dict, optional): name of the variables in the file
+        Parameters
+        ----------
+        file_name : str
+            absolute file name
+        description : str, optional
+            description of the data
+        var_names : dict, optional
+            name of the variables in the file
+
+        Returns
+        -------
+        meas_set: climada.entity.MeasureSet()
+            Measure Set from matlab file
         """
+        if var_names is None:
+            var_names = DEF_VAR_MAT
         def read_att_mat(measures, data, file_name, var_names):
             """Read MATLAB measures attributes"""
             num_mes = len(data[var_names['var_name']['name']])
             for idx in range(0, num_mes):
-                meas = Measure()
-
-                meas.name = u_hdf5.get_str_from_ref(
-                    file_name, data[var_names['var_name']['name']][idx][0])
-
                 color_str = u_hdf5.get_str_from_ref(
                     file_name, data[var_names['var_name']['color']][idx][0])
-                meas.color_rgb = np.fromstring(color_str, dtype=float, sep=' ')
-                meas.cost = data[var_names['var_name']['cost']][idx][0]
-                meas.haz_type = u_hdf5.get_str_from_ref(
-                    file_name, data[var_names['var_name']['haz']][idx][0])
-                meas.hazard_freq_cutoff = data[var_names['var_name']['haz_frq']][idx][0]
-                meas.hazard_set = u_hdf5.get_str_from_ref(
-                    file_name, data[var_names['var_name']['haz_set']][idx][0])
+
                 try:
-                    meas.hazard_inten_imp = (
+                    hazard_inten_imp = (
                         data[var_names['var_name']['haz_int_a']][idx][0],
                         data[var_names['var_name']['haz_int_b']][0][idx])
                 except KeyError:
-                    meas.hazard_inten_imp = (
+                    hazard_inten_imp = (
                         data[var_names['var_name']['haz_int_a'][:-2]][idx][0], 0)
 
-                # different convention of signes followed in MATLAB!
-                meas.mdd_impact = (data[var_names['var_name']['mdd_a']][idx][0],
-                                   data[var_names['var_name']['mdd_b']][idx][0])
-                meas.paa_impact = (data[var_names['var_name']['paa_a']][idx][0],
-                                   data[var_names['var_name']['paa_b']][idx][0])
-                meas.imp_fun_map = u_hdf5.get_str_from_ref(
-                    file_name, data[var_names['var_name']['fun_map']][idx][0])
+                meas_kwargs = dict(
+                    name=u_hdf5.get_str_from_ref(
+                        file_name, data[var_names['var_name']['name']][idx][0]),
+                    color_rgb=np.fromstring(color_str, dtype=float, sep=' '),
+                    cost=data[var_names['var_name']['cost']][idx][0],
+                    haz_type=u_hdf5.get_str_from_ref(
+                        file_name, data[var_names['var_name']['haz']][idx][0]),
+                    hazard_freq_cutoff=data[var_names['var_name']['haz_frq']][idx][0],
+                    hazard_set=u_hdf5.get_str_from_ref(
+                        file_name, data[var_names['var_name']['haz_set']][idx][0]),
+                    hazard_inten_imp=hazard_inten_imp,
+                    # different convention of signs followed in MATLAB!
+                    mdd_impact=(data[var_names['var_name']['mdd_a']][idx][0],
+                                data[var_names['var_name']['mdd_b']][idx][0]),
+                    paa_impact=(data[var_names['var_name']['paa_a']][idx][0],
+                                data[var_names['var_name']['paa_b']][idx][0]),
+                    imp_fun_map=u_hdf5.get_str_from_ref(
+                        file_name, data[var_names['var_name']['fun_map']][idx][0]),
+                    exposures_set=u_hdf5.get_str_from_ref(
+                        file_name, data[var_names['var_name']['exp_set']][idx][0]),
+                    risk_transf_attach=data[var_names['var_name']['risk_att']][idx][0],
+                    risk_transf_cover=data[var_names['var_name']['risk_cov']][idx][0],
+                )
 
-                meas.exposures_set = u_hdf5.get_str_from_ref(
-                    file_name, data[var_names['var_name']['exp_set']][idx][0])
                 exp_region_id = data[var_names['var_name']['exp_reg']][idx][0]
                 if exp_region_id:
-                    meas.exp_region_id = [exp_region_id]
-                meas.risk_transf_attach = data[var_names['var_name']['risk_att']][idx][0]
-                meas.risk_transf_cover = data[var_names['var_name']['risk_cov']][idx][0]
+                    meas_kwargs["exp_region_id"] = [exp_region_id]
 
-                measures.append(meas)
+                measures.append(Measure(**meas_kwargs))
 
         data = u_hdf5.read(file_name)
-        self.clear()
-        self.tag.file_name = str(file_name)
-        self.tag.description = description
+        meas_set = cls()
+        meas_set.tag.file_name = str(file_name)
+        meas_set.tag.description = description
         try:
             data = data[var_names['sup_field_name']]
         except KeyError:
@@ -369,81 +436,123 @@ class MeasureSet():
 
         try:
             data = data[var_names['field_name']]
-            read_att_mat(self, data, file_name, var_names)
+            read_att_mat(meas_set, data, file_name, var_names)
         except KeyError as var_err:
             raise KeyError("Variable not in MAT file: " + str(var_err)) from var_err
 
-    def read_excel(self, file_name, description='', var_names=DEF_VAR_EXCEL):
+        return meas_set
+
+    def read_mat(self, *args, **kwargs):
+        """This function is deprecated, use MeasureSet.from_mat instead."""
+        LOGGER.warning("The use of MeasureSet.read_mat is deprecated."
+                       "Use MeasureSet.from_mat instead.")
+        self.__dict__ = MeasureSet.from_mat(*args, **kwargs).__dict__
+
+    @classmethod
+    def from_excel(cls, file_name, description='', var_names=None):
         """Read excel file following template and store variables.
 
-        Parameters:
-            file_name (str): absolute file name
-            description (str, optional): description of the data
-            var_names (dict, optional): name of the variables in the file
+        Parameters
+        ----------
+        file_name : str
+            absolute file name
+        description : str, optional
+            description of the data
+        var_names : dict, optional
+            name of the variables in the file
+
+        Returns
+        -------
+        meas_set : climada.entity.MeasureSet
+            Measures set from Excel
         """
+        if var_names is None:
+            var_names = DEF_VAR_EXCEL
         def read_att_excel(measures, dfr, var_names):
             """Read Excel measures attributes"""
             num_mes = len(dfr.index)
             for idx in range(0, num_mes):
-                meas = Measure()
-
-                meas.name = dfr[var_names['col_name']['name']][idx]
+                # Search for (a, b) values, put a=1 otherwise
                 try:
-                    meas.haz_type = dfr[var_names['col_name']['haz']][idx]
+                    hazard_inten_imp = (dfr[var_names['col_name']['haz_int_a']][idx],
+                                        dfr[var_names['col_name']['haz_int_b']][idx])
+                except KeyError:
+                    hazard_inten_imp = (1, dfr['hazard intensity impact'][idx])
+
+                meas_kwargs = dict(
+                    name=dfr[var_names['col_name']['name']][idx],
+                    cost=dfr[var_names['col_name']['cost']][idx],
+                    hazard_freq_cutoff=dfr[var_names['col_name']['haz_frq']][idx],
+                    hazard_set=dfr[var_names['col_name']['haz_set']][idx],
+                    hazard_inten_imp=hazard_inten_imp,
+                    mdd_impact=(dfr[var_names['col_name']['mdd_a']][idx],
+                                dfr[var_names['col_name']['mdd_b']][idx]),
+                    paa_impact=(dfr[var_names['col_name']['paa_a']][idx],
+                                dfr[var_names['col_name']['paa_b']][idx]),
+                    imp_fun_map=dfr[var_names['col_name']['fun_map']][idx],
+                    risk_transf_attach=dfr[var_names['col_name']['risk_att']][idx],
+                    risk_transf_cover=dfr[var_names['col_name']['risk_cov']][idx],
+                    color_rgb=np.fromstring(
+                        dfr[var_names['col_name']['color']][idx], dtype=float, sep=' '),
+                )
+
+                try:
+                    meas_kwargs["haz_type"] = dfr[var_names['col_name']['haz']][idx]
                 except KeyError:
                     pass
-                meas.color_rgb = np.fromstring(
-                    dfr[var_names['col_name']['color']][idx], dtype=float, sep=' ')
-                meas.cost = dfr[var_names['col_name']['cost']][idx]
 
-                meas.hazard_freq_cutoff = dfr[var_names['col_name']['haz_frq']][idx]
-                meas.hazard_set = dfr[var_names['col_name']['haz_set']][idx]
-                # Search for (a, b) values, put a = 1 otherwise
                 try:
-                    meas.hazard_inten_imp = (dfr[var_names['col_name']['haz_int_a']][idx],
-                                             dfr[var_names['col_name']['haz_int_b']][idx])
+                    meas_kwargs["exposures_set"] = dfr[var_names['col_name']['exp_set']][idx]
                 except KeyError:
-                    meas.hazard_inten_imp = (1, dfr['hazard intensity impact'][idx])
+                    pass
 
                 try:
-                    meas.exposures_set = dfr[var_names['col_name']['exp_set']][idx]
-                    meas.exp_region_id = ast.literal_eval(dfr[var_names['col_name']['exp_reg']][idx])
+                    meas_kwargs["exp_region_id"] = ast.literal_eval(
+                        dfr[var_names['col_name']['exp_reg']][idx])
                 except KeyError:
                     pass
                 except ValueError:
-                    meas.exp_region_id = dfr[var_names['col_name']['exp_reg']][idx]
+                    meas_kwargs["exp_region_id"] = dfr[var_names['col_name']['exp_reg']][idx]
 
-                meas.mdd_impact = (dfr[var_names['col_name']['mdd_a']][idx],
-                                   dfr[var_names['col_name']['mdd_b']][idx])
-                meas.paa_impact = (dfr[var_names['col_name']['paa_a']][idx],
-                                   dfr[var_names['col_name']['paa_b']][idx])
-                meas.imp_fun_map = dfr[var_names['col_name']['fun_map']][idx]
-                meas.risk_transf_attach = dfr[var_names['col_name']['risk_att']][idx]
-                meas.risk_transf_cover = dfr[var_names['col_name']['risk_cov']][idx]
                 try:
-                    meas.risk_transf_cost_factor = dfr[var_names['col_name']['risk_fact']][idx]
+                    meas_kwargs["risk_transf_cost_factor"] = (
+                        dfr[var_names['col_name']['risk_fact']][idx]
+                    )
                 except KeyError:
                     pass
 
-                measures.append(meas)
+                measures.append(Measure(**meas_kwargs))
 
         dfr = pd.read_excel(file_name, var_names['sheet_name'])
         dfr = dfr.fillna('')
-        self.clear()
-        self.tag.file_name = str(file_name)
-        self.tag.description = description
+        meas_set = cls()
+        meas_set.tag.file_name = str(file_name)
+        meas_set.tag.description = description
         try:
-            read_att_excel(self, dfr, var_names)
+            read_att_excel(meas_set, dfr, var_names)
         except KeyError as var_err:
             raise KeyError("Variable not in Excel file: " + str(var_err)) from var_err
 
-    def write_excel(self, file_name, var_names=DEF_VAR_EXCEL):
+        return meas_set
+
+    def read_excel(self, *args, **kwargs):
+        """This function is deprecated, use MeasureSet.from_excel instead."""
+        LOGGER.warning("The use ofMeasureSet.read_excel is deprecated."
+                       "Use MeasureSet.from_excel instead.")
+        self.__dict__ = MeasureSet.from_excel(*args, **kwargs).__dict__
+
+    def write_excel(self, file_name, var_names=None):
         """Write excel file following template.
 
-        Parameters:
-            file_name (str): absolute file name to write
-            var_names (dict, optional): name of the variables in the file
+        Parameters
+        ----------
+        file_name : str
+            absolute file name to write
+        var_names : dict, optional
+            name of the variables in the file
         """
+        if var_names is None:
+            var_names = DEF_VAR_EXCEL
         def write_meas(row_ini, imp_ws, xls_data):
             """Write one measure"""
             for icol, col_dat in enumerate(xls_data):

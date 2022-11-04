@@ -3,7 +3,7 @@ climada\.engine package
 
 .. toctree::
 
-    climada.engine.uncertainty
+    climada.engine.unsequa
 
 climada\.engine\.calibration\_opt module
 ----------------------------------------
@@ -33,6 +33,14 @@ climada\.engine\.impact module
 ------------------------------
 
 .. automodule:: climada.engine.impact
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+climada\.engine\.impact\_calc module
+------------------------------------
+
+.. automodule:: climada.engine.impact_calc
     :members:
     :undoc-members:
     :show-inheritance:

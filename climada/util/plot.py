@@ -18,6 +18,7 @@ with CLIMADA. If not, see <https://www.gnu.org/licenses/>.
 
 Define auxiliary functions for plots.
 """
+# pylint: disable=abstract-class-instantiated
 
 __all__ = ['geo_bin_from_array',
            'geo_im_from_array',
@@ -29,6 +30,7 @@ __all__ = ['geo_bin_from_array',
 
 import logging
 from textwrap import wrap
+import warnings
 
 from scipy.interpolate import griddata
 import numpy as np
@@ -196,7 +198,8 @@ def _plot_scattered_data(method, array_sub, geo_coord, var_name, title,
             # use different projections for plot and data to shift the central lon in the plot
             xmin, xmax = u_coord.lon_bounds(np.concatenate([c[:, 1] for c in list_coord]))
             proj_plot = ccrs.PlateCarree(central_longitude=0.5 * (xmin + xmax))
-        _, axes, fontsize = make_map(num_im, proj=proj_plot, figsize=figsize, adapt_fontsize=adapt_fontsize)
+        _, axes, fontsize = make_map(num_im, proj=proj_plot, figsize=figsize,
+                                     adapt_fontsize=adapt_fontsize)
     else:
         fontsize = None
     axes_iter = axes
@@ -207,8 +210,7 @@ def _plot_scattered_data(method, array_sub, geo_coord, var_name, title,
     for array_im, axis, tit, name, coord in \
     zip(list_arr, axes_iter.flatten(), list_tit, list_name, list_coord):
         if coord.shape[0] != array_im.size:
-            raise ValueError("Size mismatch in input array: %s != %s." %
-                             (coord.shape[0], array_im.size))
+            raise ValueError(f"Size mismatch in input array: {coord.shape[0]} != {array_im.size}.")
 
         # Binned image with coastlines
         if isinstance(proj, ccrs.PlateCarree):
@@ -310,7 +312,8 @@ def geo_im_from_array(array_sub, coord, var_name, title,
             # use different projections for plot and data to shift the central lon in the plot
             xmin, xmax = u_coord.lon_bounds(np.concatenate([c[:, 1] for c in list_coord]))
             proj_plot = ccrs.PlateCarree(central_longitude=0.5 * (xmin + xmax))
-        _, axes, fontsize = make_map(num_im, proj=proj_plot, figsize=figsize, adapt_fontsize=adapt_fontsize)
+        _, axes, fontsize = make_map(num_im, proj=proj_plot, figsize=figsize,
+                                     adapt_fontsize=adapt_fontsize)
     else:
         fontsize = None
     axes_iter = axes
@@ -323,8 +326,7 @@ def geo_im_from_array(array_sub, coord, var_name, title,
     # Generate each subplot
     for array_im, axis, tit, name in zip(list_arr, axes_iter.flatten(), list_tit, list_name):
         if coord.shape[0] != array_im.size:
-            raise ValueError("Size mismatch in input array: %s != %s." %
-                             (coord.shape[0], array_im.size))
+            raise ValueError(f"Size mismatch in input array: {coord.shape[0]} != {array_im.size}.")
         if smooth or not is_reg:
             # Create regular grid where to interpolate the array
             grid_x, grid_y = np.mgrid[
@@ -401,7 +403,7 @@ def geo_scatter_categorical(array_sub, geo_coord, var_name, title,
         array_sub.
     cat_name : dict, optional
         Categories name for the colorbar labels.
-        Keys are all the unique values in array_cub, values are their labels.
+        Keys are all the unique values in array_sub, values are their labels.
         The default is labels = unique values.
     adapt_fontsize : bool, optional
         If set to true, the size of the fonts will be adapted to the size of the figure. Otherwise
@@ -423,18 +425,32 @@ def geo_scatter_categorical(array_sub, geo_coord, var_name, title,
 
     if 'cmap' in kwargs:
         # optional user defined colormap (can be continuous)
-        cmap = kwargs['cmap']
-        if isinstance(cmap, str):
-            cmap_name = cmap
-            cmap = mpl.cm.get_cmap(cmap)
-        else:
+        cmap_arg = kwargs['cmap']
+        if isinstance(cmap_arg, str):
+            cmap_name = cmap_arg
+            # for qualitative colormaps taking the first few colors is preferable
+            # over jumping equal distances
+            if cmap_name in ['Pastel1', 'Pastel2', 'Paired', 'Accent', 'Dark2',
+                    'Set1', 'Set2', 'Set3', 'tab10', 'tab20', 'tab20b', 'tab20c']:
+                cmap = mpl.colors.ListedColormap(
+                    mpl.cm.get_cmap(cmap_name).colors[:array_sub_n]
+                )
+            else:
+                cmap = mpl.cm.get_cmap(cmap_arg, array_sub_n)
+        elif isinstance(cmap_arg, mpl.colors.ListedColormap):
+            # If a user brings their own colormap it's probably qualitative
             cmap_name = 'defined by the user'
+            cmap = mpl.colors.ListedColormap(
+                cmap_arg.colors[:array_sub_n]
+            )
+        else:
+            raise TypeError("if cmap is given it must be either a str or a ListedColormap")
     else:
         # default qualitative colormap
         cmap_name = CMAP_CAT
         cmap = mpl.colors.ListedColormap(
-            plt.get_cmap(cmap_name).colors[:array_sub_n]
-            )
+            mpl.cm.get_cmap(cmap_name).colors[:array_sub_n]
+        )
 
     if array_sub_n > cmap.N:
         LOGGER.warning("More than %d categories cannot be plotted accurately "
@@ -445,13 +461,14 @@ def geo_scatter_categorical(array_sub, geo_coord, var_name, title,
                        cmap.N, cmap_name)
 
     # define the discrete colormap kwargs
-    kwargs['cmap'] = mpl.cm.get_cmap(cmap, array_sub_n)
+    kwargs['cmap'] = cmap
     kwargs['vmin'] = -0.5
     kwargs['vmax'] = array_sub_n - 0.5
 
     # #create the axes
-    axes = _plot_scattered_data("scatter", array_sub_cat, geo_coord, var_name, title, adapt_fontsize=adapt_fontsize,
-                                **kwargs)
+    axes = _plot_scattered_data(
+        "scatter", array_sub_cat, geo_coord, var_name, title,
+        adapt_fontsize=adapt_fontsize, **kwargs)
 
     #add colorbar labels
     if cat_name is None:
@@ -549,6 +566,17 @@ def add_shapes(axis):
         axis.add_geometries([geometry], crs=ccrs.PlateCarree(), facecolor='none',
                             edgecolor='dimgray')
 
+def _ensure_utf8(val):
+    # Without the `*.cpg` file present, the shape reader wrongly assumes latin-1 encoding:
+    # https://github.com/SciTools/cartopy/issues/1282
+    # https://github.com/SciTools/cartopy/commit/6d787b01e122eea68b67a9b2966e45877755a52d
+    # As a workaround, we encode and decode again, unless this fails which means
+    # that the `*.cpg` is present and the encoding is correct:
+    try:
+        return val.encode('latin-1').decode('utf-8')
+    except (AttributeError, UnicodeDecodeError, UnicodeEncodeError):
+        return val
+
 def add_populated_places(axis, extent, proj=ccrs.PlateCarree(), fontsize=None):
     """
     Add city names.
@@ -571,28 +599,24 @@ def add_populated_places(axis, extent, proj=ccrs.PlateCarree(), fontsize=None):
                                          name='populated_places_simple')
 
     shp = shapereader.Reader(shp_file)
-    ext_pts = list(box(extent[0], extent[2], extent[1], extent[3]).exterior.coords)
+    ext_pts = list(box(*u_coord.toggle_extent_bounds(extent)).exterior.coords)
     ext_trans = [ccrs.PlateCarree().transform_point(pts[0], pts[1], proj)
                  for pts in ext_pts]
     for rec, point in zip(shp.records(), shp.geometries()):
         if ext_trans[2][0] < point.x <= ext_trans[0][0]:
             if ext_trans[0][1] < point.y <= ext_trans[1][1]:
-                # Fiona wrongly assumes latin-1 encoding by default:
-                # https://github.com/SciTools/cartopy/issues/1282
-                # As a workaround, we encode and decode again:
-                place_name = rec.attributes['name'].encode("latin-1").decode("utf-8")
                 axis.plot(point.x, point.y, color='navy', marker='o',
                           transform=ccrs.PlateCarree(), markerfacecolor='None')
-                axis.text(point.x, point.y, place_name,
+                axis.text(point.x, point.y, _ensure_utf8(rec.attributes['name']),
                           horizontalalignment='right', verticalalignment='bottom',
                           transform=ccrs.PlateCarree(), color='navy', fontsize=fontsize)
-
 
 def add_cntry_names(axis, extent, proj=ccrs.PlateCarree(), fontsize=None):
     """
     Add country names.
 
-    Parameters:
+    Parameters
+    ----------
     axis : cartopy.mpl.geoaxes.GeoAxesSubplot
         Cartopy axis.
     extent : list
@@ -601,26 +625,22 @@ def add_cntry_names(axis, extent, proj=ccrs.PlateCarree(), fontsize=None):
         Geographical projection.
         The default is PlateCarree.
      fontsize : int, optional
-            Size of the fonts. If set to None, the default matplotlib settings
-            are used.
+        Size of the fonts. If set to None, the default matplotlib settings
+        are used.
     """
     shp_file = shapereader.natural_earth(resolution='10m', category='cultural',
                                          name='admin_0_countries')
 
     shp = shapereader.Reader(shp_file)
-    ext_pts = list(box(extent[0], extent[2], extent[1], extent[3]).exterior.coords)
+    ext_pts = list(box(*u_coord.toggle_extent_bounds(extent)).exterior.coords)
     ext_trans = [ccrs.PlateCarree().transform_point(pts[0], pts[1], proj)
                  for pts in ext_pts]
     for rec, point in zip(shp.records(), shp.geometries()):
-        # Fiona wrongly assumes latin-1 encoding by default:
-        # https://github.com/SciTools/cartopy/issues/1282
-        # As a workaround, we encode and decode again:
-        place_name = rec.attributes['NAME'].encode("latin-1").decode("utf-8")
         point_x = point.centroid.xy[0][0]
         point_y = point.centroid.xy[1][0]
         if ext_trans[2][0] < point_x <= ext_trans[0][0]:
             if ext_trans[0][1] < point_y <= ext_trans[1][1]:
-                axis.text(point_x, point_y, place_name,
+                axis.text(point_x, point_y, _ensure_utf8(rec.attributes['NAME']),
                           horizontalalignment='center', verticalalignment='center',
                           transform=ccrs.PlateCarree(), fontsize=fontsize, color='navy')
 
@@ -693,9 +713,9 @@ def _get_borders(geo_coord, buffer=0, proj_limits=(-180, 180, -90, 90)):
         limits of geographical projection (lon_min, lon_max, lat_min, lat_max)
         The default is (-180, 180, -90, 90)
 
-    Returns:
-    [min_lon, max_lon, min_lat, max_lat] : list
-
+    Returns
+    -------
+    extent : list [min_lon, max_lon, min_lat, max_lat]
     """
     min_lon = max(np.min(geo_coord[:, 1]) - buffer, proj_limits[0])
     max_lon = min(np.max(geo_coord[:, 1]) + buffer, proj_limits[1])
@@ -705,8 +725,7 @@ def _get_borders(geo_coord, buffer=0, proj_limits=(-180, 180, -90, 90)):
 
 def get_transformation(crs_in):
     """
-    Get projection and its units to use in cartopy transforamtions from
-    current crs
+    Get projection and its units to use in cartopy transforamtions from current crs.
 
     Parameters
     ----------
@@ -718,23 +737,45 @@ def get_transformation(crs_in):
     crs_epsg : ccrs.Projection
     units : str
     """
-    try:
-        if CRS.from_user_input(crs_in) == CRS.from_user_input('EPSG:3395'):
-            crs_epsg = ccrs.Mercator()
-        else:
-            crs_epsg = ccrs.epsg(CRS.from_user_input(crs_in).to_epsg())
-    except ValueError:
-        crs_epsg = ccrs.PlateCarree()
-    except requests.exceptions.ConnectionError:
-        LOGGER.warning('No internet connection.'
-                       ' Using projection PlateCarree in plot.')
-        crs_epsg = ccrs.PlateCarree()
 
+    # projection
     try:
-        units = crs_epsg.proj4_params['units']
-    except KeyError:
-        units = '°'
-    return crs_epsg, units
+        epsg = CRS.from_user_input(crs_in).to_epsg()
+        if epsg == 3395:
+            crs = ccrs.Mercator()
+        elif epsg == 4326:  # WSG 84
+            crs = ccrs.PlateCarree()
+        else:
+            crs = ccrs.epsg(epsg)
+    except ValueError:
+        LOGGER.warning(
+            "Error parsing coordinate system '%s'. Using projection PlateCarree in plot.", crs_in
+        )
+        crs = ccrs.PlateCarree()
+    except requests.exceptions.ConnectionError:
+        LOGGER.warning('No internet connection. Using projection PlateCarree in plot.')
+        crs = ccrs.PlateCarree()
+
+    # units
+    with warnings.catch_warnings():
+        # The method `to_dict` converts the crs into a string, which causes a user warning about
+        # losing important information. Since we are only interested in its units at this point,
+        # we may safely ignore it.
+        warnings.simplefilter(action="ignore", category=UserWarning)
+        try:
+            units = (crs.proj4_params.get('units')
+            # As of cartopy 0.20 the proj4_params attribute is {} for CRS from an EPSG number
+            # (see issue raised https://github.com/SciTools/cartopy/issues/1974
+            # and longterm discussion on https://github.com/SciTools/cartopy/issues/813).
+            # In these cases the units can be fetched through the method `to_dict`.
+            or crs.to_dict().get('units', '°'))
+        except AttributeError:
+            # This happens in setups with cartopy<0.20, where `to_dict` is not defined.
+            # Officially, we require cartopy>=0.20, but there are still users around that
+            # can't upgrade due to https://github.com/SciTools/iris/issues/4468
+            units = '°'
+
+    return crs, units
 
 
 def multibar_plot(ax, data, colors=None, total_width=0.8, single_width=1,
@@ -807,14 +848,14 @@ def multibar_plot(ax, data, colors=None, total_width=0.8, single_width=1,
         # Draw a bar for every value of that type
         for x, y in enumerate(values):
             if invert_axis:
-                bar = ax.barh(x + x_offset, width=y, height=bar_width * single_width,
+                lbar = ax.barh(x + x_offset, width=y, height=bar_width * single_width,
                               color=colors[i % len(colors)])
             else:
-                bar = ax.bar(x + x_offset, y, width=bar_width * single_width,
+                lbar = ax.bar(x + x_offset, y, width=bar_width * single_width,
                              color=colors[i % len(colors)])
 
         # Add a handle to the last drawn bar, which we'll need for the legend
-        bars.append(bar[0])
+        bars.append(lbar[0])
 
     if ticklabels:
         if invert_axis:

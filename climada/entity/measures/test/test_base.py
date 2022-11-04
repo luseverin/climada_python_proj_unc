@@ -20,6 +20,8 @@ Test MeasureSet and Measure classes.
 """
 import unittest
 import copy
+from pathlib import Path
+
 import numpy as np
 
 from climada import CONFIG
@@ -31,33 +33,35 @@ from climada.entity.impact_funcs.base import ImpactFunc
 from climada.entity.measures.measure_set import MeasureSet
 from climada.entity.measures.base import Measure, IMPF_ID_FACT
 from climada.util.constants import EXP_DEMO_H5, HAZ_DEMO_H5
+import climada.util.coordinates as u_coord
+import climada.hazard.test as hazard_test
+import climada.entity.exposures.test as exposures_test
 
 DATA_DIR = CONFIG.measures.test_data.dir()
 
-HAZ_TEST_MAT = CONFIG.hazard.test_data.dir().joinpath('atl_prob_no_name.mat')
-ENT_TEST_MAT = CONFIG.exposures.test_data.dir().joinpath('demo_today.mat')
+HAZ_TEST_MAT = Path(hazard_test.__file__).parent / 'data' / 'atl_prob_no_name.mat'
+ENT_TEST_MAT = Path(exposures_test.__file__).parent / 'data' / 'demo_today.mat'
 
 class TestApply(unittest.TestCase):
     """Test implement measures functions."""
     def test_change_imp_func_pass(self):
         """Test _change_imp_func"""
-        meas = MeasureSet()
-        meas.read_mat(ENT_TEST_MAT)
+        meas = MeasureSet.from_mat(ENT_TEST_MAT)
         act_1 = meas.get_measure(name='Mangroves')[0]
 
         imp_set = ImpactFuncSet()
-        imp_tc = ImpactFunc()
-        imp_tc.haz_type = 'XX'
-        imp_tc.id = 1
-        imp_tc.intensity = np.arange(10, 100, 10)
-        imp_tc.intensity[0] = 0.
-        imp_tc.intensity[-1] = 100.
-        imp_tc.mdd = np.array([0.0, 0.0, 0.021857142857143, 0.035887500000000,
+        haz_type = 'XX'
+        idx = 1
+        intensity = np.arange(10, 100, 10)
+        intensity[0] = 0.
+        intensity[-1] = 100.
+        mdd = np.array([0.0, 0.0, 0.021857142857143, 0.035887500000000,
                                0.053977415307403, 0.103534246575342, 0.180414000000000,
                                0.410796000000000, 0.410796000000000])
-        imp_tc.paa = np.array([0, 0.005000000000000, 0.042000000000000, 0.160000000000000,
+        paa = np.array([0, 0.005000000000000, 0.042000000000000, 0.160000000000000,
                                0.398500000000000, 0.657000000000000, 1.000000000000000,
                                1.000000000000000, 1.000000000000000])
+        imp_tc = ImpactFunc(haz_type, idx, intensity, mdd, paa)
         imp_set.append(imp_tc)
         new_imp = act_1._change_imp_func(imp_set).get_func('XX')[0]
 
@@ -72,19 +76,16 @@ class TestApply(unittest.TestCase):
 
     def test_cutoff_hazard_pass(self):
         """Test _cutoff_hazard_damage"""
-        meas = MeasureSet()
-        meas.read_mat(ENT_TEST_MAT)
+        meas = MeasureSet.from_mat(ENT_TEST_MAT)
         act_1 = meas.get_measure(name='Seawall')[0]
 
-        haz = Hazard('TC')
-        haz.read_mat(HAZ_TEST_MAT)
-        exp = Exposures()
-        exp.read_mat(ENT_TEST_MAT)
+        haz = Hazard.from_mat(HAZ_TEST_MAT)
+        exp = Exposures.from_mat(ENT_TEST_MAT)
         exp.gdf.rename(columns={'impf': 'impf_TC'}, inplace=True)
         exp.check()
+        exp.assign_centroids(haz)
 
-        imp_set = ImpactFuncSet()
-        imp_set.read_mat(ENT_TEST_MAT)
+        imp_set = ImpactFuncSet.from_mat(ENT_TEST_MAT)
 
         new_haz = act_1._cutoff_hazard_damage(exp, imp_set, haz)
 
@@ -108,21 +109,18 @@ class TestApply(unittest.TestCase):
 
     def test_cutoff_hazard_region_pass(self):
         """Test _cutoff_hazard_damage in specific region"""
-        meas = MeasureSet()
-        meas.read_mat(ENT_TEST_MAT)
+        meas = MeasureSet.from_mat(ENT_TEST_MAT)
         act_1 = meas.get_measure(name='Seawall')[0]
         act_1.exp_region_id = [1]
 
-        haz = Hazard('TC')
-        haz.read_mat(HAZ_TEST_MAT)
-        exp = Exposures()
-        exp.read_mat(ENT_TEST_MAT)
+        haz = Hazard.from_mat(HAZ_TEST_MAT)
+        exp = Exposures.from_mat(ENT_TEST_MAT)
         exp.gdf['region_id'] = np.zeros(exp.gdf.shape[0])
         exp.gdf.region_id.values[10:] = 1
         exp.check()
+        exp.assign_centroids(haz)
 
-        imp_set = ImpactFuncSet()
-        imp_set.read_mat(ENT_TEST_MAT)
+        imp_set = ImpactFuncSet.from_mat(ENT_TEST_MAT)
 
         new_haz = act_1._cutoff_hazard_damage(exp, imp_set, haz)
 
@@ -146,28 +144,24 @@ class TestApply(unittest.TestCase):
 
     def test_change_exposures_impf_pass(self):
         """Test _change_exposures_impf"""
-        meas = Measure()
-        meas.imp_fun_map = '1to3'
-        meas.haz_type = 'TC'
+        meas = Measure(
+            imp_fun_map='1to3',
+            haz_type='TC',
+        )
 
         imp_set = ImpactFuncSet()
-        imp_tc = ImpactFunc()
-        imp_tc.haz_type = 'TC'
-        imp_tc.id = 1
-        imp_tc.intensity = np.arange(10, 100, 10)
-        imp_tc.mdd = np.arange(10, 100, 10)
-        imp_tc.paa = np.arange(10, 100, 10)
+
+        intensity = np.arange(10, 100, 10)
+        mdd = np.arange(10, 100, 10)
+        paa = np.arange(10, 100, 10)
+        imp_tc = ImpactFunc("TC", 1, intensity, mdd, paa)
         imp_set.append(imp_tc)
 
-        imp_tc = ImpactFunc()
-        imp_tc.haz_type = 'TC'
-        imp_tc.id = 3
-        imp_tc.intensity = np.arange(10, 100, 10)
-        imp_tc.mdd = np.arange(10, 100, 10) * 2
-        imp_tc.paa = np.arange(10, 100, 10) * 2
+        mdd = np.arange(10, 100, 10) * 2
+        paa = np.arange(10, 100, 10) * 2
+        imp_tc = ImpactFunc("TC", 3, intensity, mdd, paa)
 
-        exp = Exposures()
-        exp.read_hdf5(EXP_DEMO_H5)
+        exp = Exposures.from_hdf5(EXP_DEMO_H5)
         new_exp = meas._change_exposures_impf(exp)
 
         self.assertEqual(new_exp.ref_year, exp.ref_year)
@@ -182,11 +176,9 @@ class TestApply(unittest.TestCase):
 
     def test_change_all_hazard_pass(self):
         """Test _change_all_hazard method"""
-        meas = Measure()
-        meas.hazard_set = HAZ_DEMO_H5
+        meas = Measure(hazard_set=HAZ_DEMO_H5)
 
-        ref_haz = Hazard('TC')
-        ref_haz.read_hdf5(HAZ_DEMO_H5)
+        ref_haz = Hazard.from_hdf5(HAZ_DEMO_H5)
 
         hazard = Hazard('TC')
         new_haz = meas._change_all_hazard(hazard)
@@ -202,11 +194,9 @@ class TestApply(unittest.TestCase):
 
     def test_change_all_exposures_pass(self):
         """Test _change_all_exposures method"""
-        meas = Measure()
-        meas.exposures_set = EXP_DEMO_H5
+        meas = Measure(exposures_set=EXP_DEMO_H5)
 
-        ref_exp = Exposures()
-        ref_exp.read_hdf5(EXP_DEMO_H5)
+        ref_exp = Exposures.from_hdf5(EXP_DEMO_H5)
 
         exposures = Exposures()
         exposures.gdf['latitude'] = np.ones(10)
@@ -223,8 +213,7 @@ class TestApply(unittest.TestCase):
 
     def test_not_filter_exposures_pass(self):
         """Test _filter_exposures method with []"""
-        meas = Measure()
-        meas.exp_region_id = []
+        meas = Measure(exp_region_id=[])
 
         exp = Exposures()
         imp_set = ImpactFuncSet()
@@ -247,23 +236,21 @@ class TestApply(unittest.TestCase):
 
     def test_filter_exposures_pass(self):
         """Test _filter_exposures method with two values"""
-        meas = Measure()
-        meas.exp_region_id = [3, 4]
-        meas.haz_type = 'TC'
+        meas = Measure(
+            exp_region_id=[3, 4],
+            haz_type='TC',
+        )
 
-        exp = Exposures()
-        exp.read_mat(ENT_TEST_MAT)
+        exp = Exposures.from_mat(ENT_TEST_MAT)
         exp.gdf.rename(columns={'impf_': 'impf_TC', 'centr_': 'centr_TC'}, inplace=True)
         exp.gdf['region_id'] = np.ones(exp.gdf.shape[0])
         exp.gdf.region_id.values[:exp.gdf.shape[0] // 2] = 3
         exp.gdf.region_id[0] = 4
         exp.check()
 
-        imp_set = ImpactFuncSet()
-        imp_set.read_mat(ENT_TEST_MAT)
+        imp_set = ImpactFuncSet.from_mat(ENT_TEST_MAT)
 
-        haz = Hazard('TC')
-        haz.read_mat(HAZ_TEST_MAT)
+        haz = Hazard.from_mat(HAZ_TEST_MAT)
         exp.assign_centroids(haz)
 
         new_exp = copy.deepcopy(exp)
@@ -287,8 +274,9 @@ class TestApply(unittest.TestCase):
         self.assertEqual(res_exp.value_unit, exp.value_unit)
         self.assertEqual(res_exp.tag.file_name, exp.tag.file_name)
         self.assertEqual(res_exp.tag.description, exp.tag.description)
-        self.assertEqual(res_exp.crs, exp.crs)
-        self.assertEqual(res_exp.gdf.crs, exp.gdf.crs)
+        self.assertTrue(u_coord.equal_crs(res_exp.crs, exp.crs))
+        self.assertFalse(hasattr(exp.gdf, "crs"))
+        self.assertFalse(hasattr(res_exp.gdf, "crs"))
 
         # regions (that is just input data, no need for testing, but it makes the changed and unchanged parts obious)
         self.assertTrue(np.array_equal(res_exp.gdf.region_id.values[0], 4))
@@ -346,12 +334,9 @@ class TestApply(unittest.TestCase):
 
     def test_apply_ref_pass(self):
         """Test apply method: apply all measures but insurance"""
-        hazard = Hazard('TC')
-        hazard.read_mat(HAZ_TEST_MAT)
-        hazard.haz_type = 'TC'
+        hazard = Hazard.from_mat(HAZ_TEST_MAT)
 
-        entity = Entity()
-        entity.read_mat(ENT_TEST_MAT)
+        entity = Entity.from_mat(ENT_TEST_MAT)
         entity.measures._data['TC'] = entity.measures._data.pop('XX')
         for meas in entity.measures.get_measure('TC'):
             meas.haz_type = 'TC'
@@ -385,11 +370,9 @@ class TestApply(unittest.TestCase):
     def test_calc_impact_pass(self):
         """Test calc_impact method: apply all measures but insurance"""
 
-        hazard = Hazard('TC')
-        hazard.read_mat(HAZ_TEST_MAT)
+        hazard = Hazard.from_mat(HAZ_TEST_MAT)
 
-        entity = Entity()
-        entity.read_mat(ENT_TEST_MAT)
+        entity = Entity.from_mat(ENT_TEST_MAT)
         entity.exposures.gdf.rename(columns={'impf': 'impf_TC'}, inplace=True)
         entity.measures._data['TC'] = entity.measures._data.pop('XX')
         entity.measures.get_measure(name='Mangroves', haz_type='TC').haz_type = 'TC'
@@ -400,7 +383,7 @@ class TestApply(unittest.TestCase):
         imp, risk_transf = entity.measures.get_measure('TC', 'Mangroves').calc_impact(
                 entity.exposures, entity.impact_funcs, hazard)
 
-        self.assertAlmostEqual(imp.aai_agg, 4.850407096284983e+09)
+        self.assertAlmostEqual(imp.aai_agg, 4.850407096284983e+09, delta=1)
         self.assertAlmostEqual(imp.at_event[0], 0)
         self.assertAlmostEqual(imp.at_event[12], 1.470194187501225e+07)
         self.assertAlmostEqual(imp.at_event[41], 4.7226357936631286e+08)
@@ -424,11 +407,9 @@ class TestApply(unittest.TestCase):
     def test_calc_impact_transf_pass(self):
         """Test calc_impact method: apply all measures and insurance"""
 
-        hazard = Hazard('TC')
-        hazard.read_mat(HAZ_TEST_MAT)
+        hazard = Hazard.from_mat(HAZ_TEST_MAT)
 
-        entity = Entity()
-        entity.read_mat(ENT_TEST_MAT)
+        entity = Entity.from_mat(ENT_TEST_MAT)
         entity.exposures.gdf.rename(columns={'impf': 'impf_TC'}, inplace=True)
         entity.measures._data['TC'] = entity.measures._data.pop('XX')
         for meas in entity.measures.get_measure('TC'):

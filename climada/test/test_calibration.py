@@ -19,17 +19,18 @@ with CLIMADA. If not, see <https://www.gnu.org/licenses/>.
 Test Calibration class.
 """
 import unittest
+from pathlib import Path
 import pandas as pd
 
 from climada import CONFIG
 from climada.entity.entity_def import Entity
 from climada.hazard.base import Hazard
-from climada.engine import Impact
+from climada.engine import ImpactCalc
 from climada.engine.calibration_opt import calib_instance
 from climada.util.constants import ENT_DEMO_TODAY
+import climada.hazard.test as hazard_test
 
-HAZ_DIR = CONFIG.hazard.test_data.dir()
-HAZ_TEST_MAT = HAZ_DIR.joinpath('atl_prob_no_name.mat')
+HAZ_TEST_MAT = Path(hazard_test.__file__).parent.joinpath('data', 'atl_prob_no_name.mat')
 
 DATA_FOLDER = CONFIG.test_data.dir()
 
@@ -39,13 +40,11 @@ class TestCalib(unittest.TestCase):
     def test_calib_instance(self):
         """Test save calib instance"""
          # Read default entity values
-        ent = Entity()
-        ent.read_excel(ENT_DEMO_TODAY)
+        ent = Entity.from_excel(ENT_DEMO_TODAY)
         ent.check()
 
         # Read default hazard file
-        hazard = Hazard('TC')
-        hazard.read_mat(HAZ_TEST_MAT)
+        hazard = Hazard.from_mat(HAZ_TEST_MAT)
 
         # get impact function from set
         imp_func = ent.impact_funcs.get_func(hazard.tag.haz_type,
@@ -68,9 +67,8 @@ class TestCalib(unittest.TestCase):
                                        df_in_yearly,
                                        yearly_impact=True)
         # calc Impact as comparison
-        impact = Impact()
-        impact.calc(ent.exposures, ent.impact_funcs, hazard)
-        IYS = impact.calc_impact_year_set(all_years=True)
+        impact = ImpactCalc(ent.exposures, ent.impact_funcs, hazard).impact(assign_centroids=False)
+        IYS = impact.impact_per_year(all_years=True)
 
         # do the tests
         self.assertTrue(isinstance(df_out, pd.DataFrame))

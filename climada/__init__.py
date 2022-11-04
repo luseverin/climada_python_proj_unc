@@ -21,11 +21,9 @@ climada init
 from shutil import copyfile
 from pathlib import Path
 
-from .util.config import CONFIG, setup_logging
+from .util.config import CONFIG
 from .util.constants import *
 
-
-__all__ = ['init']
 
 GSDP_DIR = SYSTEM_DIR.joinpath('GSDP')
 
@@ -38,7 +36,6 @@ REPO_DATA = {
         RIVER_FLOOD_REGIONS_CSV,
         NATEARTH_CENTROIDS[150],
         NATEARTH_CENTROIDS[360],
-        SYSTEM_DIR.joinpath('GDP2Asset_converter_2.5arcmin.nc'),
         SYSTEM_DIR.joinpath('WEALTH2GDP_factors_CRI_2016.csv'),
         SYSTEM_DIR.joinpath('GDP_TWN_IMF_WEO_data.csv'),
         SYSTEM_DIR.joinpath('FAOSTAT_data_country_codes.csv'),
@@ -61,29 +58,37 @@ REPO_DATA = {
         HAZ_DEMO_H5,
         TC_ANDREW_FL,
         DEMO_DIR.joinpath('demo_emdat_impact_data_2020.csv'),
-        DEMO_DIR.joinpath('histsoc_landuse-15crops_annual_FR_DE_DEMO_2001_2005.nc'),
-        DEMO_DIR.joinpath('hist_mean_mai-firr_1976-2005_DE_FR.hdf5'),
-        DEMO_DIR.joinpath('crop_production_demo_data_yields_CHE.nc4'),
-        DEMO_DIR.joinpath('crop_production_demo_data_cultivated_area_CHE.nc4'),
-        DEMO_DIR.joinpath('FAOSTAT_data_producer_prices.csv'),
-        DEMO_DIR.joinpath('FAOSTAT_data_production_quantity.csv'),
-        DEMO_DIR.joinpath('lpjml_ipsl-cm5a-lr_ewembi_historical_2005soc_co2_yield-whe-noirr_annual_FR_DE_DEMO_1861_2005.nc'),
-        DEMO_DIR.joinpath('h08_gfdl-esm2m_ewembi_historical_histsoc_co2_dis_global_daily_DEMO_FR_2001_2003.nc'),
-        DEMO_DIR.joinpath('h08_gfdl-esm2m_ewembi_historical_histsoc_co2_dis_global_daily_DEMO_FR_2004_2005.nc'),
-        DEMO_DIR.joinpath('gepic_gfdl-esm2m_ewembi_historical_2005soc_co2_yield-whe-noirr_global_DEMO_TJANJIN_annual_1861_2005.nc'),
-        DEMO_DIR.joinpath('pepic_miroc5_ewembi_historical_2005soc_co2_yield-whe-firr_global_annual_DEMO_TJANJIN_1861_2005.nc'),
-        DEMO_DIR.joinpath('pepic_miroc5_ewembi_historical_2005soc_co2_yield-whe-noirr_global_annual_DEMO_TJANJIN_1861_2005.nc'),
-        DEMO_DIR.joinpath('WS_ERA40_sample.mat'),
-        DEMO_DIR.joinpath('WS_Europe.xls'),
-        DEMO_DIR.joinpath('Portugal_firms_June_2017.csv'),
-        DEMO_DIR.joinpath('Portugal_firms_2016_17_18_MODIS.csv'),
-        DEMO_DIR.joinpath('SRTM15+V2.0_sample.tiff'),
+        DEMO_DIR.joinpath('nl_rails.gpkg'),
     ] + WS_DEMO_NC
 }
 
 
-def setup_climada_data(reload=False):
+def test_installation():
+    """Run this function to check whether climada is working properly.
+    If the invoked tests pass and an OK is printed out, the installation was successfull.
+    """
+    from unittest import TestLoader, TextTestRunner
+    suite = TestLoader().discover(start_dir='climada.engine.test',
+                                  pattern='test_cost_benefit.py')
+    suite.addTest(TestLoader().discover(start_dir='climada.engine.test',
+                                        pattern='test_impact.py'))
+    TextTestRunner(verbosity=2).run(suite)
 
+
+def setup_climada_data(reload=False):
+    """This function is called when climada is imported.
+    It creates a climada directory by default in the home directory.
+    Other locations can be configured in the climada.conf file.
+    The directory is filled with data files from the repository and is also the default target
+    directory for files downloaded from climada.ethz.ch via the data api.
+
+    Parameters
+    ----------
+    reload : bool, optional
+        in case system or demo data have changed in the github repository, the local copies of
+        these files can be updated by setting reload to True,
+        by default False
+    """
     for dirpath in [DEMO_DIR, SYSTEM_DIR, GSDP_DIR]:
         dirpath.mkdir(parents=True, exist_ok=True)
 
@@ -93,10 +98,4 @@ def setup_climada_data(reload=False):
                 src = Path(__file__).parent.parent.joinpath(src_dir, path.name)
                 copyfile(src, path)
 
-
-def init():
-    setup_climada_data()
-    setup_logging(CONFIG.log_level.str())
-
-
-init()
+setup_climada_data()

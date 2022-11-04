@@ -139,27 +139,25 @@ VEC_LAT = np.array([
     14.375, 11.875, 12.29166667, 12.70833333, 13.125, 13.54166667, 13.95833333, 14.375
 ])
 
+
+def data_vector():
+    vec_data = gpd.GeoDataFrame({
+        'geometry': [Point(lon, lat) for lon, lat in zip(VEC_LON, VEC_LAT)],
+        'lon': VEC_LON,
+        'lat': VEC_LAT
+    }, crs='epsg:32632')
+    return vec_data.lat.values, vec_data.lon.values, vec_data.geometry
+
 class TestVector(unittest.TestCase):
     """Test CentroidsVector class"""
 
-    @staticmethod
-    def data_vector():
-        vec_data = gpd.GeoDataFrame(crs={'init': 'epsg:32632'})
-        vec_data['geometry'] = list(zip(VEC_LON, VEC_LAT))
-        vec_data['geometry'] = vec_data['geometry'].apply(Point)
-        vec_data['lon'] = VEC_LON
-        vec_data['lat'] = VEC_LAT
-        vec_data['value'] = np.arange(VEC_LAT.size) + 100
-        return vec_data.lat.values, vec_data.lon.values, vec_data.geometry
-
-    def test_set_lat_lon_pass(self):
-        """Test set_lat_lon"""
-        centr = Centroids()
-        centr.set_lat_lon(VEC_LAT, VEC_LON)
+    def test_from_lat_lon_pass(self):
+        """Test from_lat_lon"""
+        centr = Centroids.from_lat_lon(VEC_LAT, VEC_LON)
         self.assertTrue(np.allclose(centr.lat, VEC_LAT))
         self.assertTrue(np.allclose(centr.lon, VEC_LON))
-        self.assertEqual(centr.crs, DEF_CRS)
-        self.assertEqual(centr.geometry.crs, DEF_CRS)
+        self.assertTrue(u_coord.equal_crs(centr.crs, DEF_CRS))
+        self.assertTrue(u_coord.equal_crs(centr.geometry.crs, DEF_CRS))
         self.assertEqual(centr.geometry.size, 0)
 
         centr.set_area_pixel()
@@ -167,8 +165,8 @@ class TestVector(unittest.TestCase):
 
     def test_ne_crs_geom_pass(self):
         """Test _ne_crs_geom"""
-        centr = Centroids()
-        centr.lat, centr.lon, centr.geometry = self.data_vector()
+        lat, lon, geometry = data_vector()
+        centr = Centroids(lat=lat, lon=lon, geometry=geometry)
         xy_vec = centr._ne_crs_geom()
         lon, lat = xy_vec.geometry[:].x.values, xy_vec.geometry[:].y.values
         self.assertAlmostEqual(4.51072194, lon[0])
@@ -178,27 +176,27 @@ class TestVector(unittest.TestCase):
 
     def test_dist_coast_pass(self):
         """Test set_dist_coast"""
-        centr = Centroids()
-        centr.lat, centr.lon, centr.geometry = self.data_vector()
-        centr.geometry.crs = {'init': 'epsg:4326'}
+        lat, lon, geometry = data_vector()
+        centr = Centroids(lat=lat, lon=lon, geometry=geometry)
+        centr.geometry.crs = 'epsg:4326'
         centr.set_dist_coast()
         self.assertAlmostEqual(2594.2070842031694, centr.dist_coast[1])
         self.assertAlmostEqual(166295.87602398323, centr.dist_coast[-2])
 
     def test_region_id_pass(self):
         """Test set_region_id"""
-        centr = Centroids()
-        centr.lat, centr.lon, centr.geometry = self.data_vector()
-        centr.geometry.crs = {'init': 'epsg:4326'}
+        lat, lon, geometry = data_vector()
+        geometry.crs = 'epsg:4326'
+        centr = Centroids(lat=lat, lon=lon, geometry=geometry)
         centr.set_region_id()
         self.assertEqual(np.count_nonzero(centr.region_id), 6)
         self.assertEqual(centr.region_id[0], 52)  # 052 for barbados
 
     def test_on_land(self):
         """Test set_on_land"""
-        centr = Centroids()
-        centr.lat, centr.lon, centr.geometry = self.data_vector()
-        centr.geometry.crs = {'init': 'epsg:4326'}
+        lat, lon, geometry = data_vector()
+        geometry.crs = 'epsg:4326'
+        centr = Centroids(lat=lat, lon=lon, geometry=geometry)
         centr.set_on_land()
         centr.set_region_id()
         centr.region_id[centr.region_id > 0] = 1
@@ -207,19 +205,21 @@ class TestVector(unittest.TestCase):
 
     def test_remove_duplicate_pass(self):
         """Test remove_duplicate_points"""
-        centr = Centroids()
-        centr.lat, centr.lon, centr.geometry = self.data_vector()
-        centr.geometry.crs = {'init': 'epsg:4326'}
+        lat, lon, geometry = data_vector()
+        geometry.crs = 'epsg:4326'
+        centr = Centroids(lat=lat, lon=lon, geometry=geometry)
         # create duplicates manually:
         centr.geometry.values[100] = centr.geometry.values[101]
         centr.geometry.values[120] = centr.geometry.values[101]
         centr.geometry.values[5] = Point([-59.7, 12.5])
         centr.geometry.values[133] = Point([-59.7, 12.5])
         centr.geometry.values[121] = Point([-59.7, 12.5])
+        centr.lon = centr.geometry.apply(lambda pt: pt.x).values
+        centr.lat = centr.geometry.apply(lambda pt: pt.y).values
         self.assertEqual(centr.size, 296)
         rem_centr = centr.remove_duplicate_points()
         self.assertEqual(centr.size, 296)
-        self.assertEqual(rem_centr.size, 292)  # 5 centroids removed
+        self.assertEqual(rem_centr.size, 292)
         rem2_centr = rem_centr.remove_duplicate_points()
         self.assertEqual(rem_centr.size, 292)
         self.assertEqual(rem2_centr.size, 292)
@@ -230,30 +230,29 @@ class TestVector(unittest.TestCase):
         uly, yres, lry = 0, 1, 20
         xx, yy = np.meshgrid(np.arange(ulx + xres / 2, lrx, xres),
                              np.arange(uly + yres / 2, lry, yres))
-        vec_data = gpd.GeoDataFrame(crs={'proj': 'cea'})
-        vec_data['geometry'] = list(zip(xx.flatten(), yy.flatten()))
-        vec_data['geometry'] = vec_data['geometry'].apply(Point)
-        vec_data['lon'] = xx.flatten()
-        vec_data['lat'] = yy.flatten()
+        vec_data = gpd.GeoDataFrame({
+            'geometry': [Point(xflat, yflat) for xflat, yflat in zip(xx.flatten(), yy.flatten())],
+            'lon': xx.flatten(),
+            'lat': yy.flatten(),
+        }, crs={'proj': 'cea'})
 
-        centr = Centroids()
-        centr.set_lat_lon(vec_data.lat.values, vec_data.lon.values)
+        centr = Centroids.from_lat_lon(vec_data.lat.values, vec_data.lon.values)
         centr.geometry = vec_data.geometry
         centr.set_area_pixel()
         self.assertTrue(np.allclose(centr.area_pixel, np.ones(centr.size)))
 
     def test_size_pass(self):
         """Test size property"""
-        centr = Centroids()
-        centr.lat, centr.lon, centr.geometry = self.data_vector()
-        centr.geometry.crs = {'init': 'epsg:4326'}
+        lat, lon, geometry = data_vector()
+        geometry.crs = 'epsg:4326'
+        centr = Centroids(lat=lat, lon=lon, geometry=geometry)
         self.assertEqual(centr.size, 296)
 
     def test_get_closest_point(self):
         """Test get_closest_point"""
-        centr = Centroids()
-        centr.lat, centr.lon, centr.geometry = self.data_vector()
-        centr.geometry.crs = {'init': 'epsg:4326'}
+        lat, lon, geometry = data_vector()
+        geometry.crs = 'epsg:4326'
+        centr = Centroids(lat=lat, lon=lon, geometry=geometry)
         x, y, idx = centr.get_closest_point(-58.13, 14.38)
         self.assertAlmostEqual(x, -58.125)
         self.assertAlmostEqual(y, 14.375)
@@ -263,12 +262,12 @@ class TestVector(unittest.TestCase):
 
     def test_set_lat_lon_to_meta_pass(self):
         """Test set_lat_lon_to_meta"""
-        centr = Centroids()
-        centr.lat, centr.lon, centr.geometry = self.data_vector()
-        centr.geometry.crs = {'init': 'epsg:4326'}
+        lat, lon, geometry = data_vector()
+        geometry.crs = 'epsg:4326'
+        centr = Centroids(lat=lat, lon=lon, geometry=geometry)
 
         centr.set_lat_lon_to_meta()
-        self.assertEqual(centr.meta['crs'], {'init': 'epsg:4326'})
+        self.assertTrue(u_coord.equal_crs(centr.meta['crs'], 'epsg:4326'))
         self.assertEqual(centr.meta['width'], 36)
         self.assertEqual(centr.meta['height'], 31)
         self.assertEqual(centr.meta['transform'][1], 0.0)
@@ -280,9 +279,9 @@ class TestVector(unittest.TestCase):
 
     def test_get_pixel_polygons_pass(self):
         """Test calc_pixels_polygons"""
-        centr = Centroids()
-        centr.lat, centr.lon, centr.geometry = self.data_vector()
-        centr.geometry.crs = {'init': 'epsg:4326'}
+        lat, lon, geometry = data_vector()
+        geometry.crs = 'epsg:4326'
+        centr = Centroids(lat=lat, lon=lon, geometry=geometry)
         poly = centr.calc_pixels_polygons()
         self.assertIsInstance(poly[0], Polygon)
         self.assertTrue(np.allclose(poly.centroid[:].y.values, centr.lat))
@@ -290,21 +289,20 @@ class TestVector(unittest.TestCase):
 
     def test_area_approx(self):
         """Test set_area_approx"""
-        centr = Centroids()
-        centr.lat, centr.lon, centr.geometry = self.data_vector()
-        centr.geometry.crs = {'init': 'epsg:4326'}
+        lat, lon, geometry = data_vector()
+        geometry.crs = 'epsg:4326'
+        centr = Centroids(lat=lat, lon=lon, geometry=geometry)
         with self.assertRaises(ValueError):
             centr.set_area_approx()
 
     def test_append_pass(self):
         """Append points"""
-        centr = Centroids()
-        centr.lat, centr.lon, centr.geometry = self.data_vector()
-        centr_bis = Centroids()
-        centr_bis.set_lat_lon(np.array([1, 2, 3]), np.array([4, 5, 6]))
+        lat, lon, geometry = data_vector()
+        centr = Centroids(lat=lat, lon=lon, geometry=geometry)
+        centr_bis = Centroids.from_lat_lon(np.array([1, 2, 3]), np.array([4, 5, 6]))
         with self.assertRaises(ValueError):
             centr_bis.append(centr)
-        centr.geometry.crs = {'init': 'epsg:4326'}
+        centr.geometry.crs = 'epsg:4326'
         centr_bis.append(centr)
         self.assertAlmostEqual(centr_bis.lat[0], 1)
         self.assertAlmostEqual(centr_bis.lat[1], 2)
@@ -317,10 +315,9 @@ class TestVector(unittest.TestCase):
 
     def test_equal_pass(self):
         """Test equal"""
-        centr = Centroids()
-        centr.lat, centr.lon, centr.geometry = self.data_vector()
-        centr_bis = Centroids()
-        centr_bis.set_lat_lon(np.array([1, 2, 3]), np.array([4, 5, 6]))
+        lat, lon, geometry = data_vector()
+        centr = Centroids(lat=lat, lon=lon, geometry=geometry)
+        centr_bis = Centroids.from_lat_lon(np.array([1, 2, 3]), np.array([4, 5, 6]))
         self.assertFalse(centr.equal(centr_bis))
         self.assertFalse(centr_bis.equal(centr))
         self.assertTrue(centr_bis.equal(centr_bis))
@@ -330,12 +327,11 @@ class TestVector(unittest.TestCase):
 class TestRaster(unittest.TestCase):
     """Test CentroidsRaster class"""
 
-    def test_set_raster_pxl_pass(self):
-        """Test set_raster_from_pxl_bounds from pixel borders"""
-        centr = Centroids()
+    def test_from_pix_bounds_pass(self):
+        """Test from_pix_bounds"""
         xf_lat, xo_lon, d_lat, d_lon, n_lat, n_lon = 10, 5, -0.5, 0.2, 20, 25
-        centr.set_raster_from_pix_bounds(xf_lat, xo_lon, d_lat, d_lon, n_lat, n_lon)
-        self.assertEqual(centr.meta['crs'], DEF_CRS)
+        centr = Centroids.from_pix_bounds(xf_lat, xo_lon, d_lat, d_lon, n_lat, n_lon)
+        self.assertTrue(u_coord.equal_crs(centr.meta['crs'], DEF_CRS))
         self.assertEqual(centr.meta['width'], n_lon)
         self.assertEqual(centr.meta['height'], n_lat)
         self.assertAlmostEqual(centr.meta['transform'][0], d_lon)
@@ -347,12 +343,11 @@ class TestRaster(unittest.TestCase):
         self.assertTrue('lat' in centr.__dict__.keys())
         self.assertTrue('lon' in centr.__dict__.keys())
 
-    def test_set_raster_pnt_pass(self):
-        """Test set_raster_from_pnt_bounds from point borders"""
-        centr = Centroids()
+    def test_from_pnt_bounds_pass(self):
+        """Test from_pnt_bounds"""
         left, bottom, right, top = 5, 0, 10, 10
-        centr.set_raster_from_pnt_bounds((left, bottom, right, top), 0.2)
-        self.assertEqual(centr.meta['crs'], DEF_CRS)
+        centr = Centroids.from_pnt_bounds((left, bottom, right, top), 0.2)
+        self.assertTrue(u_coord.equal_crs(centr.meta['crs'], DEF_CRS))
         self.assertEqual(centr.meta['width'], 26)
         self.assertEqual(centr.meta['height'], 51)
         self.assertAlmostEqual(centr.meta['transform'][0], 0.2)
@@ -366,8 +361,7 @@ class TestRaster(unittest.TestCase):
 
     def test_read_all_pass(self):
         """Test centr_ras data"""
-        centr_ras = Centroids()
-        inten_ras = centr_ras.set_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
+        centr_ras = Centroids.from_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
         self.assertAlmostEqual(centr_ras.meta['crs'], DEF_CRS)
         self.assertAlmostEqual(centr_ras.meta['transform'].c, -69.33714959699981)
         self.assertAlmostEqual(centr_ras.meta['transform'].a, 0.009000000000000341)
@@ -377,13 +371,14 @@ class TestRaster(unittest.TestCase):
         self.assertAlmostEqual(centr_ras.meta['transform'].e, -0.009000000000000341)
         self.assertEqual(centr_ras.meta['height'], 60)
         self.assertEqual(centr_ras.meta['width'], 50)
+
+        inten_ras = centr_ras.values_from_raster_files([HAZ_DEMO_FL], window=Window(0, 0, 50, 60))
         self.assertEqual(inten_ras.shape, (1, 60 * 50))
 
     def test_ne_crs_geom_pass(self):
         """Test _ne_crs_geom"""
-        centr_ras = Centroids()
-        centr_ras.set_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
-        centr_ras.meta['crs'] = {'init': 'epsg:32632'}
+        centr_ras = Centroids.from_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
+        centr_ras.meta['crs'] = 'epsg:32632'
 
         xy_vec = centr_ras._ne_crs_geom()
         x_vec, y_vec = xy_vec.geometry[:].x.values, xy_vec.geometry[:].y.values
@@ -394,16 +389,14 @@ class TestRaster(unittest.TestCase):
 
     def test_region_id_pass(self):
         """Test set_dist_coast"""
-        centr_ras = Centroids()
-        centr_ras.set_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
+        centr_ras = Centroids.from_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
         centr_ras.set_region_id()
         self.assertEqual(centr_ras.region_id.size, centr_ras.size)
         self.assertTrue(np.array_equal(np.unique(centr_ras.region_id), np.array([862])))
 
     def test_set_geometry_points_pass(self):
         """Test set_geometry_points"""
-        centr_ras = Centroids()
-        centr_ras.set_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
+        centr_ras = Centroids.from_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
         centr_ras.set_geometry_points()
         x_flat = np.arange(-69.3326495969998, -68.88264959699978, 0.009000000000000341)
         y_flat = np.arange(10.423720966978939, 9.883720966978919, -0.009000000000000341)
@@ -413,8 +406,7 @@ class TestRaster(unittest.TestCase):
 
     def test_dist_coast_pass(self):
         """Test set_region_id"""
-        centr_ras = Centroids()
-        centr_ras.set_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
+        centr_ras = Centroids.from_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
         centr_ras.set_dist_coast()
         centr_ras.check()
         self.assertTrue(abs(centr_ras.dist_coast[0] - 117000) < 1000)
@@ -422,16 +414,14 @@ class TestRaster(unittest.TestCase):
 
     def test_on_land(self):
         """Test set_on_land"""
-        centr_ras = Centroids()
-        centr_ras.set_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
+        centr_ras = Centroids.from_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
         centr_ras.set_on_land()
         centr_ras.check()
         self.assertTrue(np.array_equal(centr_ras.on_land, np.ones(60 * 50, bool)))
 
     def test_area_pass(self):
         """Test set_area"""
-        centr_ras = Centroids()
-        centr_ras.set_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
+        centr_ras = Centroids.from_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
         centr_ras.meta['crs'] = {'proj': 'cea'}
         centr_ras.set_area_pixel()
         centr_ras.check()
@@ -441,8 +431,7 @@ class TestRaster(unittest.TestCase):
 
     def test_area_approx(self):
         """Test set_area_approx"""
-        centr_ras = Centroids()
-        centr_ras.set_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
+        centr_ras = Centroids.from_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
         centr_ras.set_area_approx()
         approx_dim = (centr_ras.meta['transform'][0] * 111 * 1000
                       * centr_ras.meta['transform'][0] * 111 * 1000)
@@ -453,20 +442,20 @@ class TestRaster(unittest.TestCase):
 
     def test_size_pass(self):
         """Test size property"""
-        centr_ras = Centroids()
-        centr_ras.set_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
+        centr_ras = Centroids.from_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
         self.assertEqual(centr_ras.size, 50 * 60)
 
     def test_get_closest_point(self):
         """Test get_closest_point"""
         for y_sign in [1, -1]:
-            centr_ras = Centroids()
-            centr_ras.meta = {
+            meta = {
                 'width': 10,
                 'height': 20,
                 'transform': rasterio.Affine(0.5, 0, 0.1, 0, y_sign * 0.6, y_sign * (-0.3)),
                 'crs': DEF_CRS,
             }
+            centr_ras = Centroids(meta=meta)
+
             test_data = np.array([
                 [0.4, 0.1, 0.35, 0.0, 0],
                 [-0.1, 0.2, 0.35, 0.0, 0],
@@ -483,8 +472,7 @@ class TestRaster(unittest.TestCase):
                 self.assertEqual(centr_ras.lon[idx], x)
                 self.assertEqual(centr_ras.lat[idx], y)
 
-        centr_ras = Centroids()
-        centr_ras.set_lat_lon(np.array([0, 0.2, 0.7]), np.array([-0.4, 0.2, 1.1]))
+        centr_ras = Centroids.from_lat_lon(np.array([0, 0.2, 0.7]), np.array([-0.4, 0.2, 1.1]))
         x, y, idx = centr_ras.get_closest_point(0.1, 0.0)
         self.assertEqual(x, 0.2)
         self.assertEqual(y, 0.2)
@@ -492,10 +480,9 @@ class TestRaster(unittest.TestCase):
 
     def test_set_meta_to_lat_lon_pass(self):
         """Test set_meta_to_lat_lon by using its inverse set_lat_lon_to_meta"""
-        lat, lon, geometry = TestVector.data_vector()
+        lat, lon, geometry = data_vector()
 
-        centr = Centroids()
-        centr.lat, centr.lon, centr.geometry = lat, lon, geometry
+        centr = Centroids(lat=lat, lon=lon, geometry=geometry)
 
         centr.set_lat_lon_to_meta()
         meta = centr.meta
@@ -507,14 +494,12 @@ class TestRaster(unittest.TestCase):
         self.assertAlmostEqual(lon.min(), centr.lon.min(), 6)
         self.assertAlmostEqual(np.diff(centr.lon).max(), meta['transform'][0])
         self.assertAlmostEqual(np.diff(centr.lat).max(), meta['transform'][4])
-        self.assertEqual(geometry.crs, centr.geometry.crs)
+        self.assertTrue(u_coord.equal_crs(geometry.crs, centr.geometry.crs))
 
     def test_append_equal_pass(self):
         """Append raster"""
-        centr_ras = Centroids()
-        centr_ras.set_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
-        centr_bis = Centroids()
-        centr_bis.set_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
+        centr_ras = Centroids.from_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
+        centr_bis = Centroids.from_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
         centr_bis.append(centr_ras)
         self.assertAlmostEqual(centr_bis.meta['crs'], DEF_CRS)
         self.assertAlmostEqual(centr_bis.meta['transform'].c, -69.33714959699981)
@@ -528,10 +513,8 @@ class TestRaster(unittest.TestCase):
 
     def test_equal_pass(self):
         """Test equal"""
-        centr_ras = Centroids()
-        centr_ras.set_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
-        centr_bis = Centroids()
-        centr_bis.set_raster_file(HAZ_DEMO_FL, window=Window(51, 61, 10, 10))
+        centr_ras = Centroids.from_raster_file(HAZ_DEMO_FL, window=Window(0, 0, 50, 60))
+        centr_bis = Centroids.from_raster_file(HAZ_DEMO_FL, window=Window(51, 61, 10, 10))
         self.assertFalse(centr_ras.equal(centr_bis))
         self.assertFalse(centr_bis.equal(centr_ras))
         self.assertTrue(centr_ras.equal(centr_ras))
@@ -543,12 +526,12 @@ class TestCentroids(unittest.TestCase):
 
     def test_centroids_check_pass(self):
         """Test vector data in Centroids"""
-        data_vec = TestVector.data_vector()
-        centr = Centroids()
-        centr.lat, centr.lon, centr.geometry = data_vec
+        data_vec = data_vector()
+        lat, lon, geometry = data_vec
+        centr = Centroids(lat=lat, lon=lon, geometry=geometry)
         centr.check()
 
-        self.assertEqual(centr.crs, data_vec[2].crs)
+        self.assertTrue(u_coord.equal_crs(centr.crs, data_vec[2].crs))
         self.assertIsInstance(centr.total_bounds, tuple)
         for i in range(4):
             self.assertEqual(centr.total_bounds[i], data_vec[2].total_bounds[i])
@@ -591,32 +574,33 @@ class TestCentroids(unittest.TestCase):
             centr.check()
 
         centr.lon = np.array([])
-        centr.geometry = gpd.GeoSeries(np.ones(1))
-        with self.assertRaises(ValueError):
+        centr.geometry = gpd.GeoSeries(Point(0,0))
+        with self.assertRaises(ValueError) as raised:
             centr.check()
+        self.assertEqual(str(raised.exception), 'Wrong geometry size: 0 != 1.')
 
-        cen = Centroids()
-        cen.meta = {
+        meta = {
             'width': 10,
             'height': 20,
             'transform': rasterio.Affine(0.1, 0, 0, 0, 0.1, 0),
             'crs': DEF_CRS,
         }
+        cen = Centroids(meta=meta)
         with self.assertRaises(ValueError):
             cen.check()
 
 class TestReader(unittest.TestCase):
     """Test Centroids setter vector and raster methods"""
-    def test_set_vector_file_wrong_fail(self):
-        """Test set_vector_file with wrong centroids"""
+    def test_from_vector_file(self):
+        """Test from_vector_file and values_from_vector_files"""
         shp_file = shapereader.natural_earth(resolution='110m', category='cultural',
                                              name='populated_places_simple')
-        centr = Centroids()
-        inten = centr.set_vector_file(shp_file, ['pop_min', 'pop_max'])
+        centr = Centroids.from_vector_file(shp_file)
+        inten = centr.values_from_vector_files([shp_file], val_names=['pop_min', 'pop_max'])
 
-        self.assertEqual(CRS.from_user_input(centr.geometry.crs), CRS.from_epsg(u_coord.NE_EPSG))
+        self.assertTrue(u_coord.equal_crs(centr.geometry.crs, u_coord.NE_EPSG))
         self.assertEqual(centr.geometry.size, centr.lat.size)
-        self.assertEqual(CRS.from_user_input(centr.geometry.crs), CRS.from_epsg(u_coord.NE_EPSG))
+        self.assertTrue(u_coord.equal_crs(centr.geometry.crs, u_coord.NE_EPSG))
         self.assertAlmostEqual(centr.lon[0], 12.453386544971766)
         self.assertAlmostEqual(centr.lon[-1], 114.18306345846304)
         self.assertAlmostEqual(centr.lat[0], 41.903282179960115)
@@ -630,15 +614,15 @@ class TestReader(unittest.TestCase):
         self.assertEqual(inten[1, 0], 832)
         self.assertEqual(inten[1, -1], 7206000)
 
+        # Test reading values from file with incompatible geometry
         shp_file = shapereader.natural_earth(resolution='10m', category='cultural',
                                              name='populated_places_simple')
         with self.assertRaises(ValueError):
-            centr.set_vector_file(shp_file, ['pop_min', 'pop_max'])
+            centr.values_from_vector_files(shp_file, val_names=['pop_min', 'pop_max'])
 
-    def test_set_raster_file_wrong_fail(self):
-        """Test set_raster_file with wrong centroids"""
-        centr = Centroids()
-        inten_ras = centr.set_raster_file(HAZ_DEMO_FL, window=Window(10, 20, 50, 60))
+    def test_from_raster_file_wrong_fail(self):
+        """Test from_raster_file with wrong centroids"""
+        centr = Centroids.from_raster_file(HAZ_DEMO_FL, window=Window(10, 20, 50, 60))
         self.assertAlmostEqual(centr.meta['crs'], DEF_CRS)
         self.assertAlmostEqual(centr.meta['transform'].c, -69.2471495969998)
         self.assertAlmostEqual(centr.meta['transform'].a, 0.009000000000000341)
@@ -648,23 +632,23 @@ class TestReader(unittest.TestCase):
         self.assertAlmostEqual(centr.meta['transform'].e, -0.009000000000000341)
         self.assertEqual(centr.meta['height'], 60)
         self.assertEqual(centr.meta['width'], 50)
+
+        inten_ras = centr.values_from_raster_files([HAZ_DEMO_FL], window=Window(10, 20, 50, 60))
         self.assertEqual(inten_ras.shape, (1, 60 * 50))
         self.assertAlmostEqual(inten_ras.reshape((60, 50)).tocsr()[25, 12], 0.056825936)
 
         with self.assertRaises(ValueError):
-            centr.set_raster_file(HAZ_DEMO_FL, window=Window(10, 20, 52, 60))
+            centr.values_from_raster_files([HAZ_DEMO_FL], window=Window(10, 20, 52, 60))
 
     def test_write_read_raster_h5(self):
         """Write and read hdf5 format"""
         file_name = str(DATA_DIR.joinpath('test_centr.h5'))
 
-        centr = Centroids()
         xf_lat, xo_lon, d_lat, d_lon, n_lat, n_lon = 10, 5, -0.5, 0.2, 20, 25
-        centr.set_raster_from_pix_bounds(xf_lat, xo_lon, d_lat, d_lon, n_lat, n_lon)
+        centr = Centroids.from_pix_bounds(xf_lat, xo_lon, d_lat, d_lon, n_lat, n_lon)
         centr.write_hdf5(file_name)
 
-        centr_read = Centroids()
-        centr_read.read_hdf5(file_name)
+        centr_read = Centroids.from_hdf5(file_name)
         self.assertTrue(centr_read.meta)
         self.assertFalse(centr_read.lat.size)
         self.assertFalse(centr_read.lon.size)
@@ -681,13 +665,10 @@ class TestReader(unittest.TestCase):
     def test_write_read_points_h5(self):
         file_name = str(DATA_DIR.joinpath('test_centr.h5'))
 
-        centr = Centroids()
-        centr = Centroids()
-        centr.set_lat_lon(VEC_LAT, VEC_LON)
+        centr = Centroids.from_lat_lon(VEC_LAT, VEC_LON)
         centr.write_hdf5(file_name)
 
-        centr_read = Centroids()
-        centr_read.read_hdf5(file_name)
+        centr_read = Centroids.from_hdf5(file_name)
         self.assertFalse(centr_read.meta)
         self.assertTrue(centr_read.lat.size)
         self.assertTrue(centr_read.lon.size)
@@ -698,9 +679,8 @@ class TestReader(unittest.TestCase):
 class TestCentroidsFuncs(unittest.TestCase):
     """Test Centroids methods"""
     def test_select_pass(self):
-        """Test set_vector"""
-        centr = Centroids()
-        centr.set_lat_lon(VEC_LAT, VEC_LON)
+        """Test Centroids.select method"""
+        centr = Centroids.from_lat_lon(VEC_LAT, VEC_LON)
 
         centr.region_id = np.zeros(VEC_LAT.size)
         centr.region_id[[100, 200]] = 10
@@ -715,9 +695,8 @@ class TestCentroidsFuncs(unittest.TestCase):
 
     def test_select_extent_pass(self):
         """Test select extent"""
-        centr = Centroids()
-        centr.set_lat_lon(np.array([-5, -3, 0, 3, 5]),
-                          np.array([-180, -175, -170, 170, 175]))
+        centr = Centroids.from_lat_lon(
+            np.array([-5, -3, 0, 3, 5]), np.array([-180, -175, -170, 170, 175]))
         centr.check()
         centr.region_id = np.zeros(len(centr.lat))
         ext_centr = centr.select(extent=[-175, -170, -5, 5])

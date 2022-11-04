@@ -23,8 +23,8 @@ Created on Mon Nov 16 19:21:42 2020
 
 import logging
 import math
-import numpy as np
 import decimal
+import numpy as np
 
 
 LOGGER = logging.getLogger(__name__)
@@ -42,7 +42,11 @@ def sig_dig(x, n_sig_dig = 16):
     """
     Rounds x to n_sig_dig number of significant digits.
     0, inf, Nan are returned unchanged.
-    Examples: n_sig_dig = 5
+
+    Examples
+    --------
+        with n_sig_dig = 5:
+
         1.234567 -> 1.2346, 123456.89 -> 123460.0
 
     Parameters
@@ -88,10 +92,22 @@ def sig_dig_list(iterable, n_sig_dig=16):
     """
     return np.vectorize(sig_dig)(iterable, n_sig_dig)
 
+def convert_monetary_value(values, abbrev, n_sig_dig=None):
+
+    if isinstance(values, (int, float)):
+        values = [values]
+
+    thsder = list(ABBREV.keys())[list(ABBREV.values()).index(abbrev)]
+    mon_val = np.array(values) / thsder
+    if n_sig_dig is not None:
+        mon_val = [sig_dig(val, n_sig_dig=n_sig_dig) for val in mon_val]
+
+    return mon_val
+
 
 def value_to_monetary_unit(values, n_sig_dig=None, abbreviations=None):
-    """
-    Converts list of values to closest common monetary unit 
+    """Converts list of values to closest common monetary unit.
+
     0, Nan and inf have not unit.
 
     Parameters
@@ -100,17 +116,21 @@ def value_to_monetary_unit(values, n_sig_dig=None, abbreviations=None):
         Values to be converted
     n_sig_dig : int, optional
         Number of significant digits to return.
-        Examples n_sig_di=5: 1.234567 -> 1.2346, 123456.89 -> 123460.0
+
+        Examples: n_sig_di=5: 1.234567 -> 1.2346, 123456.89 -> 123460.0
+
         Default: all digits are returned.
     abbreviations: dict, optional
         Name of the abbreviations for the money 1000s counts
+
         Default:
-         {
-          1:'',
-          1000: 'K',
-          1000000: 'M',
-          1000000000: 'Bn',
-          1000000000000: 'Tn'}
+        {
+        1:'',
+        1000: 'K',
+        1000000: 'M',
+        1000000000: 'Bn',
+        1000000000000: 'Tn'
+        }
 
     Returns
     -------
@@ -118,7 +138,7 @@ def value_to_monetary_unit(values, n_sig_dig=None, abbreviations=None):
         Array of values in monetary unit
     name : string
         Monetary unit
-        
+
     Examples
     --------
     values = [1e6, 2*1e6, 4.5*1e7, 0, Nan, inf] ->
@@ -126,7 +146,6 @@ def value_to_monetary_unit(values, n_sig_dig=None, abbreviations=None):
         ['M']
 
     """
-
     if isinstance(values, (int, float)):
         values = [values]
 

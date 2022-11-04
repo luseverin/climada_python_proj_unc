@@ -203,7 +203,7 @@ def get_required_nl_files(bounds):
     last_tile_lat = min(np.floor(-(max_lat - 90) / tile_width), 1)
 
     for i_lon in range(0, int(len(req_files) / 2)):
-        if first_tile_lon <= i_lon and last_tile_lon >= i_lon:
+        if first_tile_lon <= i_lon <= last_tile_lon:
             if first_tile_lat == 0 or last_tile_lat == 0:
                 req_files[((i_lon)) * 2] = 1
             if first_tile_lat == 1 or last_tile_lat == 1:
@@ -217,21 +217,23 @@ def check_nl_local_file_exists(required_files=None, check_path=SYSTEM_DIR,
     """Checks if BM Satellite files are avaialbe and returns a vector
     denoting the missing files.
 
-    Parameters:
-        required_files : numpy array, optional
-            boolean array of dimension (8,) with which
-            some files can be skipped. Only files with value 1 are checked,
-            with value zero are skipped.
-            The default is np.ones(len(BM_FILENAMES),)
-        check_path : str or Path
-            absolute path where files are stored.
-            Default: SYSTEM_DIR
-        year : int
-            year of the image, e.g. 2016
+    Parameters
+    ----------
+    required_files : numpy array, optional
+        boolean array of dimension (8,) with which
+        some files can be skipped. Only files with value 1 are checked,
+        with value zero are skipped.
+        The default is np.ones(len(BM_FILENAMES),)
+    check_path : str or Path
+        absolute path where files are stored.
+        Default: SYSTEM_DIR
+    year : int
+        year of the image, e.g. 2016
 
-    Returns:
-        files_exist : numpy array
-            Boolean array that denotes if the required files exist.
+    Returns
+    -------
+    files_exist : numpy array
+        Boolean array that denotes if the required files exist.
     """
     if required_files is None:
         required_files = np.ones(len(BM_FILENAMES),)
@@ -365,12 +367,19 @@ def load_nightlight_nasa(bounds, req_files, year):
 
     Note: Legacy for BlackMarble, not required for litpop module
 
-    Parameters:
-        bounds (tuple): min_lon, min_lat, max_lon, max_lat
-        req_files (np.array): array with flags for NASA files needed
-        year (int): nightlight year
-    Returns:
-        nightlight (sparse.csr_matrix), coord_nl (np.array)
+    Parameters
+    ----------
+    bounds : tuple
+        min_lon, min_lat, max_lon, max_lat
+    req_files : np.array
+        array with flags for NASA files needed
+    year : int
+        nightlight year
+
+    Returns
+    -------
+    nightlight : sparse.csr_matrix
+    coord_nl : np.array
     """
     # TODO: argument req_files is not used in this function
 
@@ -392,7 +401,7 @@ def load_nightlight_nasa(bounds, req_files, year):
             # this tile does not intersect the specified bounds
             continue
         extent = np.int64(np.clip(extent, 0, tile_size[None] - 1))
-
+        # pylint: disable=unsubscriptable-object
         im_nl, _ = read_bm_file(SYSTEM_DIR, fname %(year))
         im_nl = np.flipud(im_nl)
         im_nl = sparse.csc.csc_matrix(im_nl)
@@ -412,15 +421,16 @@ def load_nightlight_nasa(bounds, req_files, year):
 
 def read_bm_file(bm_path, filename):
     """Reads a single NASA BlackMarble GeoTiff and returns the data. Run all required checks first.
-    Parameters
 
     Note: Legacy for BlackMarble, not required for litpop module
 
+    Parameters
     ----------
     bm_path : str
         absolute path where files are stored.
     filename : str
         filename of the file to be read.
+
     Returns
     -------
     arr1 : array
@@ -443,12 +453,16 @@ def unzip_tif_to_py(file_gz):
     """Unzip image file, read it, flip the x axis, save values as pickle
     and remove tif.
 
-    Parameters:
-        file_gz (str): file fith .gz format to unzip
+    Parameters
+    ----------
+    file_gz : str
+        file fith .gz format to unzip
 
-    Returns:
-        str (file_name of unzipped file)
-        sparse.csr_matrix (nightlight)
+    Returns
+    -------
+    fname : str
+        file_name of unzipped file
+    nightlight : sparse.csr_matrix
     """
     LOGGER.info("Unzipping file %s.", file_gz)
     file_name = Path(Path(file_gz).stem)
@@ -469,52 +483,50 @@ def untar_noaa_stable_nightlight(f_tar_ini):
     """Move input tar file to SYSTEM_DIR and extract stable light file.
     Returns absolute path of stable light file in format tif.gz.
 
-    Parameters:
-        f_tar_ini : str
-            absolute path of file
+    Parameters
+    ----------
+    f_tar_ini : str
+        absolute path of file
 
-    Returns:
-        f_tif_gz : str
-            path of stable light file
+    Returns
+    -------
+    f_tif_gz : str
+        path of stable light file
     """
     # move to SYSTEM_DIR
     f_tar_dest = SYSTEM_DIR.joinpath(Path(f_tar_ini).name)
     shutil.move(f_tar_ini, f_tar_dest)
     # extract stable_lights.avg_vis.tif
-    tar_file = tarfile.open(f_tar_ini)
-    extract_name = [name for name in tar_file.getnames()
-                    if name.endswith('stable_lights.avg_vis.tif.gz')]
-    if len(extract_name) == 0:
-        raise ValueError('No stable light intensities for selected year and satellite '
-                         f'in file {f_tar_ini}')
-    if len(extract_name) > 1:
-        LOGGER.warning('found more than one potential intensity file in' +
-                       ' %s %s', f_tar_ini, extract_name)
-    try:
+    with tarfile.open(f_tar_ini) as tar_file:
+        extract_name = [name for name in tar_file.getnames()
+                        if name.endswith('stable_lights.avg_vis.tif.gz')]
+        if len(extract_name) == 0:
+            raise ValueError('No stable light intensities for selected year and satellite '
+                            f'in file {f_tar_ini}')
+        if len(extract_name) > 1:
+            LOGGER.warning('found more than one potential intensity file in %s %s',
+                           f_tar_ini, extract_name)
         tar_file.extract(extract_name[0], SYSTEM_DIR)
-    except tarfile.TarError as err:
-        raise
-    finally:
-        tar_file.close()
-    f_tif_gz = SYSTEM_DIR.joinpath(extract_name[0])
+    return SYSTEM_DIR.joinpath(extract_name[0])
 
-    return f_tif_gz
 
 def load_nightlight_noaa(ref_year=2013, sat_name=None):
     """Get nightlight luminosites. Nightlight matrix, lat and lon ordered
     such that nightlight[1][0] corresponds to lat[1], lon[0] point (the image
     has been flipped).
 
-    Parameters:
-        ref_year : int, optional
-            reference year. The default is 2013.
-        sat_name : str, optional
-            satellite provider (e.g. 'F10', 'F18', ...)
+    Parameters
+    ----------
+    ref_year : int, optional
+        reference year. The default is 2013.
+    sat_name : str, optional
+        satellite provider (e.g. 'F10', 'F18', ...)
 
-    Returns:
-        nightlight : sparse.csr_matrix)
-        coord_nl : np.array
-        fn_light : str
+    Returns
+    -------
+    nightlight : sparse.csr_matrix
+    coord_nl : np.array
+    fn_light : str
     """
     # NOAA's URL used to retrieve nightlight satellite images:
     noaa_url = CONFIG.exposures.litpop.nightlights.noaa_url.str()

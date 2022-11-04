@@ -31,20 +31,21 @@ class TestFuncs(unittest.TestCase):
 
     def test_get_transform_4326_pass(self):
         """Check _get_transformation for 4326 epsg."""
-        res, unit = u_plot.get_transformation({'init': 'epsg:4326'})
+        res, unit = u_plot.get_transformation('epsg:4326')
         self.assertIsInstance(res, cartopy.crs.PlateCarree)
         self.assertEqual(unit, '°')
 
     def test_get_transform_3395_pass(self):
         """Check that assigned attribute is correctly set."""
-        res, unit = u_plot.get_transformation({'init': 'epsg:3395'})
+        res, unit = u_plot.get_transformation('epsg:3395')
         self.assertIsInstance(res, cartopy.crs.Mercator)
         self.assertEqual(unit, 'm')
 
     def test_get_transform_3035_pass(self):
         """Check that assigned attribute is correctly set."""
-        res, unit = u_plot.get_transformation({'init': 'epsg:3035'})
-        self.assertIsInstance(res, cartopy._epsg._EPSGProjection)
+        res, unit = u_plot.get_transformation('epsg:3035')
+        self.assertIsInstance(res, cartopy.crs.Projection)
+        self.assertEqual(res.epsg_code, 3035)
         self.assertEqual(unit, 'm')
 
 class TestPlots(unittest.TestCase):
@@ -66,7 +67,7 @@ class TestPlots(unittest.TestCase):
                                   1: 'int',
                                   2.0: 'float',
                                   'a': 'string'},
-                        pop_name=False, cmap='Set1')
+                        pop_name=False, cmap=plt.get_cmap('Set1'))
         plt.close()
 
         #test colormap warning
@@ -74,7 +75,7 @@ class TestPlots(unittest.TestCase):
                            [12, 13, 14, 15]])
         coord = np.array([[26, 0], [26, 4], [28, 0], [29, 1]])
         u_plot.geo_scatter_categorical(values, coord, 'value', 'test plot',
-                        pop_name=False, cmap='Set1')
+                        pop_name=False, cmap='viridis')
 
         plt.close()
 

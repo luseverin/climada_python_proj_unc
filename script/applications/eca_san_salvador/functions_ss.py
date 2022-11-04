@@ -29,13 +29,13 @@ def plot_salvador_ma():
     shape_poly = wkt.loads(risk_shape)
     shape = gpd.GeoDataFrame()
     shape['geometry'] = [shape_poly]
-    shape.crs = {'init': 'epsg:4326'}
+    shape.crs = 'epsg:4326'
     shape.to_crs(epsg=3857, inplace=True)
 
     ax = shape.plot(figsize=(10, 10), alpha=0.5)
     ax.set_xlim(-9943223.896891385, -9911000.065720687)
     ax.set_ylim(1530712.637786494, 1555600.2891258441)
-    ctx.add_basemap(ax, zoom=12, url=ctx.sources.ST_TERRAIN)
+    ctx.add_basemap(ax, zoom=12, url=ctx.providers.Stamen.Terrain)
     rect = patches.Rectangle((-9931038.907412536, 1536570.51725147), 4354.653554389253,
                               2941.9125608841423, linewidth=1, edgecolor='r', facecolor='none')
     ax.add_patch(rect)
@@ -50,8 +50,7 @@ from climada.hazard import Hazard
 
 def load_entity():
     ent_file = 'FL_entity_Acelhuate_houses.xlsx'
-    ent = Entity()
-    ent.read_excel(ent_file)
+    ent = Entity.from_excel(ent_file)
     ent.exposures.set_geometry_points()
     ent.check()
     return ent
@@ -149,7 +148,7 @@ def plot_exposure_ss(exposures, point=None):
         plt.legend(lines_legend, text_legend, numpoints=1, loc=3, title='AUP housing')
         plt.gca().add_artist(legend1)
 
-    ctx.add_basemap(ax, zoom=15, url=ctx.sources.OSM_C, origin='upper')
+    ctx.add_basemap(ax, zoom=15, url=ctx.providers.OpenStreetMap.Mapnik, origin='upper')
     scale_bar(ax, 0.5, location=(0.93, 0.4), linewidth=2)
     rect = patches.Rectangle((-9931033.307412536, 1536686.51725147), 4345.053554389253,
                               2934.0125608841423, linewidth=2, edgecolor='r', facecolor='none', zorder=200)

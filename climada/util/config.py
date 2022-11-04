@@ -21,7 +21,6 @@ Define configuration parameters.
 
 __all__ = [
     'CONFIG',
-    'setup_logging',
 ]
 
 import sys
@@ -31,16 +30,8 @@ import logging
 from pathlib import Path
 
 
-def remove_handlers(logger):
-    """Remove logger handlers."""
-    if logger.hasHandlers():
-        for handler in logger.handlers:
-            logger.removeHandler(handler)
-
 LOGGER = logging.getLogger('climada')
-LOGGER.setLevel(logging.DEBUG)
 LOGGER.propagate = False
-remove_handlers(LOGGER)
 FORMATTER = logging.Formatter(
     "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 CONSOLE = logging.StreamHandler(stream=sys.stdout)
@@ -48,25 +39,26 @@ CONSOLE.setFormatter(FORMATTER)
 LOGGER.addHandler(CONSOLE)
 
 
-def setup_logging(log_level='DEBUG'):
-    """Setup logging configuration"""
-    remove_handlers(LOGGER)
-    LOGGER.propagate = False
-    LOGGER.setLevel(getattr(logging, log_level))
-    LOGGER.addHandler(CONSOLE)
-
-
 class Config():
     """Convenience Class. A Config object is a slow JSON object like nested dictonary who's values
     can be accessed by their names right away. E.g.: `a.b.c.str()` instead of `a['b']['c']`
     """
+
+    SOURCE_DIR = None
+    """If a config value is a path and the root directory is given as '...' it will be replaced by
+    the path to the installation directory.
+    Like this it's possible to refer to e.g. test files in the climada sources.
+    """
+
     def __str__(self):
-        # pylint: disable=bare-except,multiple-statements
+        # pylint: disable=bare-except,multiple-statements,too-complex
         try: return self.str()
         except: pass
         try: return str(self.int())
         except: pass
         try: return str(self.float())
+        except: pass
+        try: return str(self.bool())
         except: pass
         try: return str(self.list())
         except: pass
@@ -85,7 +77,7 @@ class Config():
             the top Config object, required for self referencing str objects,
             if None, it is pointing to self, otherwise it's passed from containing to
             contained.
-        val : [float, int, str, list], optional
+        val : [float, int, bool, str, list], optional
             the value of the Config in case it's basic, by default None,
             when a dictionary like object is created
         """
@@ -124,6 +116,26 @@ class Config():
             raise Exception(f"{self._val.__class__}, not str")
         if self._val.__class__ is list:
             return self._val[index].str()
+        raise Exception(f"{self._val.__class__}, not list")
+
+    def bool(self, index=None):
+        """
+        Returns
+        -------
+        bool
+            the value of this Config interpreted as boolean
+
+        Raises
+        ------
+        Exception
+            if it cannot be take as boolean
+        """
+        if index is None:
+            if self._val.__class__ is bool:
+                return self._val
+            raise Exception(f"{self._val.__class__}, not bool")
+        if self._val.__class__ is list:
+            return self._val[index].bool()
         raise Exception(f"{self._val.__class__}, not list")
 
     def int(self, index=None):
@@ -230,10 +242,17 @@ class Config():
         Exception
             if the value is not a string or if the directory cannot be created
         """
-        path = Path(self.str(index)).expanduser()
+        path = self._expand_source_dir(Path(self.str(index)).expanduser())
         if create:
             path.mkdir(parents=True, exist_ok=True)
         return path.absolute()
+
+    @classmethod
+    def _expand_source_dir(cls, path):
+        parts = path.parts
+        if parts[0] == '...':
+            return Path(cls.SOURCE_DIR, *parts[1:])
+        return Path(*parts)
 
     @classmethod
     def _objectify_dict(cls, dct, root):
@@ -267,7 +286,7 @@ class Config():
         ----------
         dct : dict
             keys must be of type str.
-            values can be one of these: int, float, str, dict, list.
+            values can be one of these: int, float, bool, str, dict, list.
         Returns
         -------
         Config
@@ -306,7 +325,7 @@ def _fetch_conf(directories, config_name):
     for conf_path in superseding_configs:
         if conf_path is None:
             continue
-        with open(conf_path) as conf:
+        with open(conf_path, encoding='utf-8') as conf:
             dct = json.load(conf)
             conf_dct = _supersede(conf_dct, dct)
 
@@ -321,3 +340,5 @@ CONFIG = Config.from_dict(_fetch_conf([
     Path(Path.home(), '.config'),  # ~/.config directory
     Path.cwd(),  # current working directory
 ], CONFIG_NAME))
+Config.SOURCE_DIR = SOURCE_DIR
+LOGGER.setLevel(getattr(logging, CONFIG.log_level.str()))
