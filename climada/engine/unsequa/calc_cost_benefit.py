@@ -129,7 +129,7 @@ class CalcCostBenefit(Calc):
 
 
 
-    def uncertainty(self, unc_data, pool=None, **cost_benefit_kwargs):
+    def uncertainty(self, unc_data, pool=None, loglevel='ERROR', **cost_benefit_kwargs):
         """
         Computes the cost benefit for each sample in unc_output.sample_df.
 
@@ -152,6 +152,8 @@ class CalcCostBenefit(Calc):
         pool : pathos.pools.ProcessPool, optional
             Pool of CPUs for parralel computations. Default is None.
             The default is None.
+        loglevel: level of warning for the climada logger during the computation.
+            The default is "ERROR".
         cost_benefit_kwargs : keyword arguments
             Keyword arguments passed on to climada.engine.CostBenefit.calc()
 
@@ -171,6 +173,8 @@ class CalcCostBenefit(Calc):
         --------
         climada.engine.cost_benefit:
             Compute risk and adptation option cost benefits.
+        climada.util.log_level: set log level
+
 
         """
 
@@ -197,7 +201,7 @@ class CalcCostBenefit(Calc):
         self.est_comp_time(unc_data.n_samples, elapsed_time, pool)
 
         #Compute impact distributions
-        with log_level(level='ERROR', name_prefix='climada'):
+        with log_level(level=loglevel, name_prefix='climada'):
             if pool:
                 LOGGER.info('Using %s CPUs.', pool.ncpus)
                 chunksize = min(unc_data.n_samples // pool.ncpus, 100)
@@ -210,7 +214,7 @@ class CalcCostBenefit(Calc):
                                  samples_df.iterrows())
 
         #Perform the actual computation
-        with log_level(level='ERROR', name_prefix='climada'):
+        with log_level(level=loglevel, name_prefix='climada'):
             [imp_meas_present,
              imp_meas_future,
              tot_climate_risk,

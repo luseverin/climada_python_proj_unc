@@ -120,7 +120,8 @@ class CalcImpact(Calc):
                     rp=None,
                     calc_eai_exp=False,
                     calc_at_event=False,
-                    pool=None
+                    pool=None,
+                    loglevel='ERROR'
                     ):
         """
         Computes the impact for each sample in unc_data.sample_df.
@@ -159,6 +160,8 @@ class CalcImpact(Calc):
         pool : pathos.pools.ProcessPool, optional
             Pool of CPUs for parralel computations.
             The default is None.
+        loglevel: level of warning for the climada logger during the computation.
+            The default is "ERROR".
 
         Returns
         -------
@@ -175,6 +178,8 @@ class CalcImpact(Calc):
         See Also
         --------
         climada.engine.impact: Compute risk.
+        climada.util.log_level: set log level
+
 
         """
 
@@ -202,7 +207,7 @@ class CalcImpact(Calc):
         self.est_comp_time(unc_sample.n_samples, elapsed_time, pool)
 
         #Compute impact distributions
-        with log_level(level='ERROR', name_prefix='climada'):
+        with log_level(level=loglevel, name_prefix='climada'):
             if pool:
                 LOGGER.info('Using %s CPUs.', pool.ncpus)
                 chunksize = min(unc_sample.n_samples // pool.ncpus, 100)
@@ -215,7 +220,7 @@ class CalcImpact(Calc):
                                   samples_df.iterrows())
 
         #Perform the actual computation
-        with log_level(level='ERROR', name_prefix='climada'):
+        with log_level(level=loglevel, name_prefix='climada'):
             [aai_agg_list, freq_curve_list,
              eai_exp_list, at_event_list,
              tot_value_list] = list(zip(*imp_metrics))
