@@ -297,8 +297,8 @@ class CalcDeltaImpact(Calc):
         impf_final = self.impf_final_input_var.evaluate(**impf_final_samples)
         haz_final = self.haz_final_input_var.evaluate(**haz_final_samples)
 
-        exp_initial.assign_centroids(haz_initial, overwrite=False)
-        exp_final.assign_centroids(haz_final, overwrite=False)
+        exp_initial.assign_centroids(haz_initial, overwrite=False, threshold=300)
+        exp_final.assign_centroids(haz_final, overwrite=False, threshold=300)
 
         imp_initial = ImpactCalc(exposures=exp_initial, impfset=impf_initial, hazard=haz_initial)\
               .impact(assign_centroids=False)
@@ -326,8 +326,8 @@ class CalcDeltaImpact(Calc):
 
 
         return [
-            imp_final.aai_agg - imp_initial.aai_agg,
-            freq_curve_final - freq_curve_initial,
-            eai_exp_final - eai_exp_initial,
-            at_event_final - at_event_initial,
-            imp_final.tot_value - imp_initial.tot_value]
+            100*(imp_final.aai_agg - imp_initial.aai_agg) / imp_initial.aai_agg,
+            100*(freq_curve_final - freq_curve_initial) / freq_curve_initial,
+            100*(eai_exp_final - eai_exp_initial) / eai_exp_initial,
+            100*(at_event_final - at_event_initial) / at_event_initial,
+            100*(imp_final.tot_value - imp_initial.tot_value) / imp_initial.tot_value]
